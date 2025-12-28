@@ -1,8 +1,16 @@
-import logo from "./logo.svg";
 import "./App.css";
+import Foorter from "./Components/Foorter";
+import Navbar from "./Components/Navbar";
+import MainPage from "./Page/MainPage";
 
 function App() {
-  return <></>;
+  return (
+    <>
+      <Navbar />
+      <MainPage />
+      <Foorter />
+    </>
+  );
 }
 
 export default App;

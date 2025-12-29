@@ -1,16 +1,36 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const Navbar = () => {
+  const menuItems = [
+    { path: "/Airing", key: "방영중" },
+    { path: "/Upcoming", key: "예정작" },
+    { path: "/Airing", key: "장르" },
+    { path: "/Airing", key: "게시판" },
+  ];
+
+  const MenuItem = ({ path, label, onClick }) => (
+    <li>
+      <Link to={path} className="hover:text-gray-500 transition duration-300" onClick={onClick}>
+        {label}
+      </Link>
+    </li>
+  );
+
   return (
     <>
       <nav className="fixed top-0 left-0 w-full bg-white shadow-lg z-50">
         <div className="w-full flex justify-between items-center py-4 px-6">
-          <p className="text-2xl font-bold text-gray-800">AniWiki</p>
-          <div>
-            <button className="px-4 py-2 rounded  hover:text-gray-500 transition">방영중</button>
-            <button className="px-4 py-2 rounded  hover:text-gray-500 transition">예정작</button>
-            <button className="px-4 py-2 rounded  hover:text-gray-500 transition">장르</button>
-            <button className="px-4 py-2 rounded  hover:text-gray-500 transition">게시판</button>
+          <Link to="/" className="text-2xl font-bold text-gray-800">
+            AniWiki
+          </Link>
+
+          <div className="flex justify-center">
+            <ul className="flex gap-8 text-lg">
+              {menuItems.map((item) => (
+                <MenuItem key={item.path} path={item.path} label={item.key} />
+              ))}
+            </ul>
           </div>
           <div className="flex space-x-4">
             <button className="px-4 py-2 rounded hover:bg-gray-200 transition">Login</button>

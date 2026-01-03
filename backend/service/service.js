@@ -1,6 +1,7 @@
 const express = require("express");
 const fetch = require("node-fetch"); // 반드시 이렇게 import
 const router = express.Router();
+const Translation = require("../models/translation");
 
 const GOOGLE_KEY = process.env.GOOGLETRANSLATION;
 

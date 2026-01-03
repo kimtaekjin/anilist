@@ -24,6 +24,7 @@ const AiringAnimePage = () => {
         body: JSON.stringify({ text, target: "ko" }),
       });
       const data = await res.json();
+
       return data.translatedText;
     } catch (err) {
       console.error("Translation error:", err);
@@ -37,19 +38,19 @@ const AiringAnimePage = () => {
       .then(async (json) => {
         const days = { 월: [], 화: [], 수: [], 목: [], 금: [], 토: [], 일: [] };
         const newTranslated = {};
-        console.log("확인");
 
         for (let anime of json.data) {
           const day = dayMap[anime.broadcast?.day];
           if (day) days[day].push(anime);
 
           // 번역
-          const titleKR = await translateText(anime.title);
+          const titleKR = anime.title ? await translateText(anime.title) : "";
           const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "";
           newTranslated[anime.mal_id] = { title: titleKR, synopsis: synopsisKR };
         }
 
         days["전체"] = Object.values(days).flat();
+        console.log("확인:", days);
         setSchedule(days);
         setTranslated(newTranslated);
         setIsLoading(false);
@@ -94,9 +95,9 @@ const AiringAnimePage = () => {
               <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
               <div className="p-4">
                 <h3 className="font-bold text-lg mb-1">{translated[anime.mal_id]?.title || anime.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">
+                {/* <p className="text-sm text-gray-600 mb-2">
                   {translated[anime.mal_id]?.synopsis || anime.synopsis || "줄거리 없음"}
-                </p>
+                </p> */}
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
                   <span>{anime.episodes ?? "?"}화</span>

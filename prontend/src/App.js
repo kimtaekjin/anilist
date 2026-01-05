@@ -7,6 +7,7 @@ import Footer from "./Components/Foorter";
 import Airing from "./Page/Airing";
 import Upcoming from "./Page/Upcoming";
 import GenreSection from "./Page/GenreSection";
+import AnimeDetail from "./Page/AnimeDetail";
 
 function Layout() {
   return (
@@ -44,6 +45,10 @@ const route = createBrowserRouter([
       {
         path: "/Genre",
         element: <GenreSection />,
+      },
+      {
+        path: "/AnimeDetail",
+        element: <AnimeDetail />,
       },
     ],
   },

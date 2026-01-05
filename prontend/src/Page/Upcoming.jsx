@@ -95,8 +95,8 @@ const Upcoming = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {animeList.map((anime, idx) => (
             <div
-              key={`${anime.id}-${idx}`} // 중복 방지
-              className="bg-gradient-to-b from-gray-100 to-white rounded-3xl shadow-xl overflow-hidden transform hover:scale-105 transition-all duration-300"
+              key={anime.mal_id}
+              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition"
             >
               {/* 이미지 */}
               {anime.image && (
@@ -122,8 +122,6 @@ const Upcoming = () => {
                     </span>
                   ))}
                 </div>
-
-                <p className="text-gray-500 text-sm mb-2 line-clamp-3">{anime.synopsis}</p>
 
                 <div className="flex justify-between text-gray-400 text-sm mt-4 border-t border-gray-200 pt-2">
                   <span>방영 시작: {anime.startDate}</span>

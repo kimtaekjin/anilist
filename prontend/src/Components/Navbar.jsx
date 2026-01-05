@@ -4,8 +4,8 @@ import { Link } from "react-router-dom";
 const Navbar = () => {
   const menuItems = [
     { path: "/Airing", key: "방영중" },
+    { path: "/Genre", key: "장르 · 분기" },
     { path: "/Upcoming", key: "예정작" },
-    { path: "/Genre", key: "장르" },
     { path: "/Airing", key: "게시판" },
   ];
 

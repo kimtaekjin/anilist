@@ -126,9 +126,6 @@ const AiringAnimePage = () => {
                 <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
                 <div className="p-4">
                   <h3 className="font-bold text-lg mb-1">{translated[anime.mal_id]?.title || anime.title}</h3>
-                  {/* <p className="text-sm text-gray-600 mb-2">
-                    {translated[anime.mal_id]?.synopsis || anime.synopsis || "줄거리 없음"}
-                  </p> */}
                   <div className="flex justify-between text-sm text-gray-400">
                     <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
                     <span>{anime.episodes ? "화" : "미방"}</span>

@@ -6,6 +6,7 @@ import Trending from "./Page/Trending";
 import Footer from "./Components/Foorter";
 import Airing from "./Page/Airing";
 import Upcoming from "./Page/Upcoming";
+import GenreSection from "./Page/GenreSection";
 
 function Layout() {
   return (
@@ -39,6 +40,10 @@ const route = createBrowserRouter([
       {
         path: "/Upcoming",
         element: <Upcoming />,
+      },
+      {
+        path: "/Genre",
+        element: <GenreSection />,
       },
     ],
   },

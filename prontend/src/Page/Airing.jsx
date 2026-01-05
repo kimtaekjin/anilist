@@ -1,5 +1,18 @@
 import React, { useEffect, useState } from "react";
 
+// Skeleton 카드
+const AnimeCardSkeleton = () => (
+  <div className="rounded-2xl bg-white shadow-lg overflow-hidden animate-pulse">
+    <div className="h-48 bg-gray-200" />
+    <div className="p-4 space-y-2">
+      <div className="h-5 bg-gray-200 rounded w-3/4" />
+      <div className="h-4 bg-gray-200 rounded w-full" />
+      <div className="h-4 bg-gray-200 rounded w-5/6" />
+      <div className="h-3 bg-gray-200 rounded w-1/3 mt-2" />
+    </div>
+  </div>
+);
+
 const AiringAnimePage = () => {
   const [schedule, setSchedule] = useState({});
   const [selectedDay, setSelectedDay] = useState("전체");
@@ -24,7 +37,6 @@ const AiringAnimePage = () => {
         body: JSON.stringify({ text, target: "ko" }),
       });
       const data = await res.json();
-
       return data.translatedText;
     } catch (err) {
       console.error("Translation error:", err);
@@ -33,79 +45,97 @@ const AiringAnimePage = () => {
   };
 
   useEffect(() => {
-    fetch("https://api.jikan.moe/v4/seasons/now")
-      .then((res) => res.json())
-      .then(async (json) => {
+    const fetchAnimeSchedule = async () => {
+      try {
+        const res = await fetch("https://api.jikan.moe/v4/seasons/now");
+        const json = await res.json();
+
         const days = { 월: [], 화: [], 수: [], 목: [], 금: [], 토: [], 일: [] };
+
+        // 번역 + 데이터 가공 병렬 처리
+        const translatedList = await Promise.all(
+          json.data.map(async (anime) => {
+            const day = dayMap[anime.broadcast?.day];
+            if (day) days[day].push(anime);
+
+            const titleKR = anime.title_japanese ? await translateText(anime.title_japanese) : anime.title;
+
+            const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "";
+
+            return {
+              id: anime.mal_id,
+              title: titleKR,
+              synopsis: synopsisKR,
+            };
+          })
+        );
+
         const newTranslated = {};
-
-        for (let anime of json.data) {
-          const day = dayMap[anime.broadcast?.day];
-          if (day) days[day].push(anime);
-
-          // 번역
-          const titleKR = anime.title ? await translateText(anime.title_japanese) : "";
-          const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "";
-          newTranslated[anime.mal_id] = { title: titleKR, synopsis: synopsisKR };
-        }
+        translatedList.forEach((item) => {
+          newTranslated[item.id] = {
+            title: item.title,
+            synopsis: item.synopsis,
+          };
+        });
 
         days["전체"] = Object.values(days).flat();
-        console.log("확인:", days);
+
         setSchedule(days);
         setTranslated(newTranslated);
-        setIsLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
+      } finally {
         setIsLoading(false);
-      });
+      }
+    };
+
+    fetchAnimeSchedule();
   }, []);
 
   const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
 
-  if (isLoading) return <div className="text-center py-20">데이터를 가져오는 중입니다...</div>;
-
   return (
     <div className="container mx-auto px-4 py-20">
-      <h1 className="text-3xl font-bold mb-8">방영중 애니</h1>
+      <h1 className="text-3xl font-bold mb-8 text-center">방영중 애니</h1>
 
+      {/* 요일 선택 버튼 */}
       <div className="flex space-x-4 mb-8 overflow-x-auto scrollbar-hide">
         {days.map((day) => (
           <button
             key={day}
             onClick={() => setSelectedDay(day)}
-            className={`px-4 py-2 rounded-full font-medium ${
+            className={`px-4 py-2 rounded-full font-medium transition ${
               selectedDay === day ? "bg-red-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            } transition`}
+            }`}
           >
             {day}
           </button>
         ))}
       </div>
 
+      {/* 카드 그리드 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-        {schedule[selectedDay]?.length === 0 ? (
-          <p className="text-gray-400 col-span-full">방영 애니가 없습니다.</p>
-        ) : (
-          schedule[selectedDay].map((anime) => (
-            <div
-              key={anime.mal_id}
-              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition"
-            >
-              <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
-              <div className="p-4">
-                <h3 className="font-bold text-lg mb-1">{translated[anime.mal_id]?.title || anime.title}</h3>
-                {/* <p className="text-sm text-gray-600 mb-2">
-                  {translated[anime.mal_id]?.synopsis || anime.synopsis || "줄거리 없음"}
-                </p> */}
-                <div className="flex justify-between text-sm text-gray-400">
-                  <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
-                  <span>{anime.episodes ?? "?"}화</span>
+        {isLoading
+          ? // Skeleton 8개 출력
+            Array.from({ length: 8 }).map((_, i) => <AnimeCardSkeleton key={i} />)
+          : schedule[selectedDay].map((anime) => (
+              <div
+                key={anime.mal_id}
+                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition"
+              >
+                <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
+                <div className="p-4">
+                  <h3 className="font-bold text-lg mb-1">{translated[anime.mal_id]?.title || anime.title}</h3>
+                  {/* <p className="text-sm text-gray-600 mb-2">
+                    {translated[anime.mal_id]?.synopsis || anime.synopsis || "줄거리 없음"}
+                  </p> */}
+                  <div className="flex justify-between text-sm text-gray-400">
+                    <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
+                    <span>{anime.episodes ? "화" : "미방"}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))}
       </div>
     </div>
   );

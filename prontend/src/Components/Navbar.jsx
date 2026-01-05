@@ -5,7 +5,7 @@ const Navbar = () => {
   const menuItems = [
     { path: "/Airing", key: "방영중" },
     { path: "/Upcoming", key: "예정작" },
-    { path: "/Airing", key: "장르" },
+    { path: "/Genre", key: "장르" },
     { path: "/Airing", key: "게시판" },
   ];
 

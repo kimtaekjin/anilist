@@ -17,16 +17,30 @@ function isRomaji(text) {
   return onlyLatin && romajiPattern.test(text);
 }
 
-function fixTitleTranslation(text) {
-  if (!text) return "";
+const wordReplacements = [
+  { from: "추시의 아이", to: "최애의 아이" },
+  { from: "에치", to: "하렘" },
+  { from: "보치 · 자 · 롯쿠!", to: "봇치 더 락!" },
+  { from: "고우메", to: "미식" },
+  { from: "mys 테리", to: "미스테리" },
+  { from: "공상", to: "판타지" },
+  { from: "행동", to: "액션" },
+  { from: "미결", to: "반전" },
+  { from: "신의 조화", to: "초자연" },
+];
 
-  // 번역이 제대로 되지 않은 제목의 경우 특정 패턴 넣어서 번역
-  const trimmed = text.trim();
-  const fixed = trimmed.replace(/(【)추시의 아이(】)/g, "$1최애의 아이$2");
+function FallbackText(translatedText) {
+  if (!translatedText) return "";
 
+  let fixed = translatedText.trim();
+
+  for (const { from, to } of wordReplacements) {
+    // 단어 경계 제거, g = 모두 교체, i = 대소문자 무시
+    const regex = new RegExp(from, "gi");
+    fixed = fixed.replace(regex, to);
+  }
   return fixed;
 }
-
 // ----------------------
 // 번역 실패 감지
 // ----------------------
@@ -80,7 +94,6 @@ function romajiToKatakana(text) {
 router.post("/translate", async (req, res) => {
   const { text, target } = req.body;
   const targetLang = target || "ko";
-  // console.log("확인용::", text);
 
   const originalText = text;
   let sourceLang = "auto";
@@ -91,7 +104,7 @@ router.post("/translate", async (req, res) => {
     if (isRomaji(originalText)) {
       sourceLang = "ja";
       textToTranslate = romajiToKatakana(originalText);
-      console.log("Katakana 변환:", textToTranslate, " 오리지날::", originalText);
+      // console.log("Katakana 변환:", textToTranslate, " 오리지날::", originalText);
     }
 
     // DB 캐시 확인
@@ -117,8 +130,7 @@ router.post("/translate", async (req, res) => {
       if (!translationFailed(originalText, retry)) translatedText = retry;
     }
 
-    translatedText = fixTitleTranslation(translatedText);
-
+    translatedText = FallbackText(translatedText);
     // DB 저장
     await Translation.findOneAndUpdate(
       { originalText, targetLang, sourceLang },

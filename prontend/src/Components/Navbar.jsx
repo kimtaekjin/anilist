@@ -21,7 +21,7 @@ const Navbar = () => {
     <>
       <nav className="fixed top-0 left-0 w-full bg-white shadow-lg z-50">
         <div className="w-full flex justify-between items-center py-4 px-6">
-          <Link to="/" className="text-2xl font-bold text-gray-800">
+          <Link to="/" className="text-2xl font-bold text-gray-800 border-2 border-black px-2">
             AniWiki
           </Link>
 

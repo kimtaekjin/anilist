@@ -21,7 +21,6 @@ const UpcomingAnimePage = () => {
   const [animeList, setAnimeList] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // URL에서 장르 가져오기
   const initialGenres = useMemo(() => {
     const param = searchParams.get("genre");
     return param ? param.split(",") : [];
@@ -29,7 +28,6 @@ const UpcomingAnimePage = () => {
 
   const [selectedGenres, setSelectedGenres] = useState(initialGenres);
 
-  // 번역 함수
   const translateText = async (text) => {
     try {
       const res = await fetch("http://localhost:3000/service/translate", {
@@ -55,15 +53,17 @@ const UpcomingAnimePage = () => {
         const translatedData = await Promise.all(
           json.data.map(async (anime) => {
             const titleKR = anime.title_japanese ? await translateText(anime.title_japanese) : anime.title;
-
             const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "줄거리 정보 없음";
+            const genreKR = anime.genres
+              ? await Promise.all(anime.genres.map(async (g) => await translateText(g.name)))
+              : [];
 
             return {
               id: anime.mal_id,
               title: titleKR,
               synopsis: synopsisKR,
               image: anime.images?.jpg?.image_url,
-              genre: anime.genres?.map((g) => g.name) || [],
+              genre: genreKR || [],
               startDate: anime.aired?.from ? anime.aired.from.slice(0, 10) : "미정",
               studio: anime.studios?.[0]?.name || "미정",
             };
@@ -106,7 +106,7 @@ const UpcomingAnimePage = () => {
     <div className="container mx-auto px-4 py-20">
       {/* 타이틀 */}
       <h1 className="text-4xl font-extrabold mb-8 text-center bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-transparent bg-clip-text">
-        방영 예정 작품
+        장르별 작품
       </h1>
 
       {/* 장르 필터 */}
@@ -175,7 +175,7 @@ const UpcomingAnimePage = () => {
 
                 <div className="flex justify-between text-gray-400 text-sm mt-4 border-t border-gray-200 pt-2">
                   <span>방영 시작: {anime.startDate}</span>
-                  <span>제작: {anime.studio}</span>
+                  <span>제작사: {anime.studio}</span>
                 </div>
               </div>
             </div>

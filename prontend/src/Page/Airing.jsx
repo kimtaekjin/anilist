@@ -96,7 +96,7 @@ const AiringAnimePage = () => {
 
   return (
     <div className="container mx-auto px-4 py-20">
-      <h1 className="text-3xl font-bold mb-8 text-center">방영중 애니</h1>
+      <h1 className="text-3xl font-bold mb-8 text-left">방영중 애니</h1>
 
       {/* 요일 선택 버튼 */}
       <div className="flex space-x-4 mb-8 overflow-x-auto scrollbar-hide">

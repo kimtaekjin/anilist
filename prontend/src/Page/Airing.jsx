@@ -44,7 +44,7 @@ const AiringAnimePage = () => {
           if (day) days[day].push(anime);
 
           // 번역
-          const titleKR = anime.title ? await translateText(anime.title) : "";
+          const titleKR = anime.title ? await translateText(anime.title_japanese) : "";
           const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "";
           newTranslated[anime.mal_id] = { title: titleKR, synopsis: synopsisKR };
         }

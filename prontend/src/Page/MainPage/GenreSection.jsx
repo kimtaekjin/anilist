@@ -236,7 +236,12 @@ const GenreSection = () => {
                 onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
                 className="bg-white rounded-2xl shadow-lg cursor-pointer hover:shadow-xl"
               >
-                <img src={anime.image} alt={anime.title} className="h-48 w-full object-cover" />
+                {/* 이미지 영역 */}
+                <div className="h-52 w-full overflow-hidden rounded-t-2xl bg-gray-200">
+                  <img src={anime.image} alt={anime.title} className="w-full h-full object-cover" />
+                </div>
+
+                {/* 텍스트 영역 */}
                 <div className="p-4">
                   <h3 className="font-bold mb-2 line-clamp-1">{anime.title}</h3>
                   <div className="flex flex-wrap gap-1 mb-2">

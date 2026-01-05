@@ -13,7 +13,7 @@ const AnimeCardSkeleton = () => (
   </div>
 );
 
-const AiringAnimePage = () => {
+const Airing = () => {
   const [schedule, setSchedule] = useState({});
   const [selectedDay, setSelectedDay] = useState("전체");
   const [isLoading, setIsLoading] = useState(true);
@@ -138,4 +138,4 @@ const AiringAnimePage = () => {
   );
 };
 
-export default AiringAnimePage;
+export default Airing;

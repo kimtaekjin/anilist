@@ -1,11 +1,11 @@
 import React, { useRef, useEffect } from "react";
 
-import anime1 from "../asset/anime1.jpg";
-import anime2 from "../asset/anime2.jpg";
-import anime3 from "../asset/anime3.jpg";
-import anime4 from "../asset/anime4.jpg";
-import anime5 from "../asset/anime5.jpg";
-import anime6 from "../asset/anime6.jpg";
+import anime1 from "../../asset/anime1.jpg";
+import anime2 from "../../asset/anime2.jpg";
+import anime3 from "../../asset/anime3.jpg";
+import anime4 from "../../asset/anime4.jpg";
+import anime5 from "../../asset/anime5.jpg";
+import anime6 from "../../asset/anime6.jpg";
 
 function Trending() {
   const animeList = [

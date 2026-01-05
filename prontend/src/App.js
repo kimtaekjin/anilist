@@ -1,13 +1,13 @@
 import "./App.css";
 import Navbar from "./Components/Navbar";
-import MainPage from "./Page/MainPage";
 import { createBrowserRouter, RouterProvider, Outlet, Navigate } from "react-router-dom";
-import Trending from "./Page/Trending";
 import Footer from "./Components/Foorter";
-import Airing from "./Page/Airing";
-import Upcoming from "./Page/Upcoming";
-import GenreSection from "./Page/GenreSection";
-import AnimeDetail from "./Page/AnimeDetail";
+import MainPage from "./Page/MainPage/MainPage";
+import Trending from "./Page/MainPage/Trending";
+import Upcoming from "./Page/MainPage/Upcoming";
+import GenreSection from "./Page/MainPage/GenreSection";
+import AnimeDetail from "./Page/DetailPage/AnimeDetail";
+import Airing from "./Page/MainPage/Airing";
 
 function Layout() {
   return (

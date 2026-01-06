@@ -19,7 +19,7 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 w-full bg-white shadow-lg z-50">
+      <nav className="fixed top-0 left-0 w-full bg-[rgb(220,225,235)] shadow-lg z-50">
         <div className="w-full flex justify-between items-center py-4 px-6">
           <Link to="/" className="text-2xl font-bold text-gray-800 border-2 border-black px-2">
             AniWiki
@@ -34,7 +34,7 @@ const Navbar = () => {
           </div>
           <div className="flex space-x-4">
             <Link to="/login">
-              <button className="px-4 py-2 rounded hover:bg-gray-200 transition">Login</button>
+              <button className="px-4 py-2 rounded hover:text-gray-500 transition">Login</button>
             </Link>
             <Link to="/singUp">
               <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Sign Up</button>

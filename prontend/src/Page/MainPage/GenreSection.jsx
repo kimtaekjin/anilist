@@ -278,7 +278,7 @@ const GenreSection = () => {
                   <button
                     key={p}
                     onClick={() => setCurrentPage(p)}
-                    className={`px-3 py-1 rounded ${currentPage === p ? "bg-red-600 text-white" : "bg-gray-200"}`}
+                    className={`px-3 py-1 rounded-2xl ${currentPage === p ? "bg-red-600 text-white" : "bg-gray-200"}`}
                   >
                     {p}
                   </button>

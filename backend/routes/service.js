@@ -1,8 +1,6 @@
 const express = require("express");
-const fetch = require("node-fetch");
 const router = express.Router();
 const Translation = require("../models/translation");
-const wanakana = require("wanakana");
 const {
   romajiToKatakana,
   translate,

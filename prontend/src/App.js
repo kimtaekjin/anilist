@@ -8,6 +8,8 @@ import Upcoming from "./Page/MainPage/Upcoming";
 import GenreSection from "./Page/MainPage/GenreSection";
 import AnimeDetail from "./Page/DetailPage/AnimeDetail";
 import Airing from "./Page/MainPage/Airing";
+import Login from "./Page/Login/Login";
+import SingUp from "./Page/Login/SingUp";
 
 function Layout() {
   return (
@@ -49,6 +51,14 @@ const route = createBrowserRouter([
       {
         path: "/AnimeDetail",
         element: <AnimeDetail />,
+      },
+      {
+        path: "/Login",
+        element: <Login />,
+      },
+      {
+        path: "/singUp",
+        element: <SingUp />,
       },
     ],
   },

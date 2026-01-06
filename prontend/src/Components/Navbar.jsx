@@ -33,8 +33,12 @@ const Navbar = () => {
             </ul>
           </div>
           <div className="flex space-x-4">
-            <button className="px-4 py-2 rounded hover:bg-gray-200 transition">Login</button>
-            <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Sign Up</button>
+            <Link to="/login">
+              <button className="px-4 py-2 rounded hover:bg-gray-200 transition">Login</button>
+            </Link>
+            <Link to="/singUp">
+              <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Sign Up</button>
+            </Link>
           </div>
         </div>
       </nav>

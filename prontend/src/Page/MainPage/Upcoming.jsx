@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-
+import { Calendar, Building } from "lucide-react";
 // Skeleton 카드
 const AnimeCardSkeleton = () => (
   <div className="rounded-3xl bg-white shadow-xl overflow-hidden animate-pulse">
@@ -123,9 +123,16 @@ const Upcoming = () => {
                   ))}
                 </div>
 
-                <div className="flex justify-between text-gray-400 text-sm mt-4 border-t border-gray-200 pt-2">
-                  <span>방영 시작: {anime.startDate}</span>
-                  <span>제작사: {anime.studio}</span>
+                <div className="flex justify-between items-center text-gray-500 text-sm mt-4 border-t border-gray-200 pt-2">
+                  <div className="flex items-center gap-1">
+                    <Calendar size={14} className="text-gray-400" />
+                    <span>{anime.startDate}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Building size={14} className="text-gray-400" />
+                    <span>{anime.studio}</span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ import AnimeDetail from "./Page/DetailPage/AnimeDetail";
 import Airing from "./Page/MainPage/Airing";
 import Login from "./Page/Login/Login";
 import SingUp from "./Page/Login/SingUp";
+import Board from "./Page/BoardPage/BoardPage";
 
 function Layout() {
   return (
@@ -59,6 +60,10 @@ const route = createBrowserRouter([
       {
         path: "/singUp",
         element: <SingUp />,
+      },
+      {
+        path: "/board",
+        element: <Board />,
       },
     ],
   },

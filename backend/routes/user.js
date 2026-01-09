@@ -9,8 +9,8 @@ router.post("/singup", async (req, res) => {
   try {
     const { username, password, email } = req.body;
 
-    const existUser = await User.findOne({ email });
     const existNick = await User.findOne({ username });
+    const existUser = await User.findOne({ email });
 
     if (existUser) {
       return res.status(400).json({ message: "이미 존재하는 사용자입니다." });
@@ -19,8 +19,8 @@ router.post("/singup", async (req, res) => {
     if (existNick) {
       return res.status(400).json({ message: "이미 존재하는 닉네임입니다." });
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("여기 오는지");
 
     const user = new User({
       email,
@@ -45,30 +45,30 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "사용자를 찾을 수 없습니다." });
     }
 
-    if (!user.isActive) {
-      return res.status(401).json({ message: "비활성화된 계정입니다. 관리자에게 문의하세요." });
-    }
+    // if (!user.isActive) {
+    //   return res.status(401).json({ message: "비활성화된 계정입니다. 관리자에게 문의하세요." });
+    // }
     //   if (user.isLoggedIn) {
     //     return res.status(401).json({ message: "이미 다른 기기에서 로그인되어 있습니다." });
     //   }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      user.failedLoginAttempts += 1;
+      //   user.failedLoginAttempts += 1;
       user.lastLoginAttempt = new Date();
 
-      if (user.failedLoginAttempts >= 5) {
-        user.isActive = false;
-        await user.save();
-        return res.status(401).json({
-          message: "비밀번호를 5회 이상 틀려 계정이 비활성화되었습니다.",
-        });
-      }
+      //   if (user.failedLoginAttempts >= 5) {
+      //     user.isActive = false;
+      //     await user.save();
+      //     return res.status(401).json({
+      //       message: "비밀번호를 5회 이상 틀려 계정이 비활성화되었습니다.",
+      //     });
+      //   }
 
       await user.save();
       return res.status(401).json({
         message: "비밀번호가 일치하지 않습니다.",
-        remainingAttempts: 5 - user.failedLoginAttempts,
+        // remainingAttempts: 5 - user.failedLoginAttempts,
       });
     }
 

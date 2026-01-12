@@ -88,7 +88,7 @@ router.post("/login", async (req, res) => {
     await user.save();
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email }, //여기서 값을 넣을때는 몽고DB의 컬럼값을 기준으로 한다.
+      { userId: user._id, email: user.email, userName: user.username }, //여기서 값을 넣을때는 몽고DB의 컬럼값을 기준으로 한다.
       process.env.JWT_SECRET, //jwt는 시크릿키를 발급하여 이를 통해 jwt토큰을 생성 및 유통을 한다.
       { expiresIn: "24h" } //JWT의 유효기간
     );
@@ -149,9 +149,8 @@ router.post("/logout", async (req, res) => {
   }
 });
 
-router.post("/verify-token", (req, res) => {
+router.get("/verify-token", (req, res) => {
   const token = req.cookies.token;
-  // console.log("token확인::",token);
 
   if (!token) {
     return res.status(400).json({ isValid: false, message: "토큰이 유효하지 않습니다." });

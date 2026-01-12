@@ -1,6 +1,7 @@
 import "./App.css";
 import Navbar from "./Components/Navbar";
-import { createBrowserRouter, RouterProvider, Outlet, Navigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 import Footer from "./Components/Foorter";
 import MainPage from "./Page/MainPage/MainPage";
 import Trending from "./Page/MainPage/Trending";
@@ -70,7 +71,11 @@ const route = createBrowserRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={route} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={route} />
+    </AuthProvider>
+  );
 }
 
 export default App;

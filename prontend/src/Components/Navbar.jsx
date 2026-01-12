@@ -1,7 +1,12 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import axios from "axios";
 
 const Navbar = () => {
+  const { isLogin, logout, token, user } = useAuth();
+  const navigate = useNavigate();
+
   const menuItems = [
     { path: "/Airing", key: "방영중" },
     { path: "/Genre", key: "장르 · 분기" },
@@ -16,6 +21,21 @@ const Navbar = () => {
       </Link>
     </li>
   );
+
+  const handleLogout = async (e) => {
+    try {
+      e.preventDefault();
+      const resposne = await axios.post("http://localhost:3000/user/logout", {}, { withCredentials: true });
+
+      if (resposne.data) {
+        logout();
+        alert(resposne.data.message);
+        navigate("/");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   return (
     <>
@@ -32,14 +52,32 @@ const Navbar = () => {
               ))}
             </ul>
           </div>
-          <div className="flex space-x-4">
-            <Link to="/login">
-              <button className="px-4 py-2 rounded hover:text-gray-500 transition">Login</button>
-            </Link>
-            <Link to="/singUp">
-              <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Sign Up</button>
-            </Link>
-          </div>
+          {isLogin ? (
+            <div className="flex space-x-2">
+              <div className="px-4 py-2">
+                <p>{user?.userName}님 환영합니다.</p>
+              </div>
+              <div>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                  onClick={handleLogout}
+                >
+                  로그아웃
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex space-x-4">
+              <Link to="/login">
+                <button className="px-4 py-2 rounded hover:text-gray-500 transition">로그인</button>
+              </Link>
+              <Link to="/singUp">
+                <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
+                  회원가입
+                </button>
+              </Link>
+            </div>
+          )}
         </div>
       </nav>
     </>

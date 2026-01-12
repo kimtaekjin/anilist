@@ -3,15 +3,19 @@ const app = express();
 const PORT = 3000;
 const cors = require("cors");
 const mongoose = require("mongoose");
+const cookieParser = require("cookie-parser"); //req.cookies.token 할 시 쿠키를  jwt 전체가 아닌 문자열만 가져오게 한다.  cookie-parser 미들웨어
+
 require("dotenv").config();
 
 const service = require("./routes/service");
 const user = require("./routes/user");
 
+app.use(cookieParser());
+
 app.use(
   cors({
     origin: "http://localhost:3001", //배포할 경우 배포한 도메인을 새로 넣어줘야 한다!
-    // credentials: true,
+    credentials: true,
   })
 );
 

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import loginImage from "../../asset/login.jpg";
 import axios from "axios";
 
@@ -8,11 +9,18 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
+  const { login } = useAuth();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post("http://localhost:3000/user/login", { email, password });
+      const response = await axios.post(
+        "http://localhost:3000/user/login",
+        { email, password },
+        { withCredentials: true }
+      );
       if (response.data) {
+        login(response.data.token);
         localStorage.setItem("token", response.data.token);
         alert(response.data.message || "로그인 되었습니다.");
         navigate("/");
@@ -62,9 +70,11 @@ const Login = () => {
           </div>
 
           <div className="flex justify-center mt-3">
-            <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
-              회원가입
-            </p>
+            <Link to="/singup">
+              <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
+                회원가입
+              </p>
+            </Link>
           </div>
         </div>
       </div>

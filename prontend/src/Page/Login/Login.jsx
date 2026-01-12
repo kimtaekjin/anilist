@@ -1,7 +1,28 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import loginImage from "../../asset/login.jpg";
+import axios from "axios";
 
 const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post("http://localhost:3000/user/login", { email, password });
+      if (response.data) {
+        localStorage.setItem("token", response.data.token);
+        alert(response.data.message || "로그인 되었습니다.");
+        navigate("/");
+      }
+    } catch (error) {
+      const message = error.response?.data?.message || "로그인에 실패하였습니다.";
+      alert(message);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-white">
       <div className="flex rounded-lg overflow-hidden">
@@ -13,15 +34,19 @@ const Login = () => {
         {/* 로그인 폼 */}
         <div className="bg-gray-50 p-8 w-80 max-w-md flex flex-col justify-center" style={{ height: "400px" }}>
           <h3 className="text-2xl font-bold mb-10 text-center text-gray-500">Login</h3>
-          <form>
+          <form onSubmit={handleSubmit}>
             <input
               type="text"
               placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none mb-4"
             />
             <input
               type="password"
               placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none mb-6"
             />
             <div className="flex justify-center">

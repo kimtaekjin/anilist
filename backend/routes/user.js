@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
+const jwt = require("jsonwebtoken");
 
 router.use(express.json());
 
@@ -76,13 +77,13 @@ router.post("/login", async (req, res) => {
     user.lastLoginAttempt = new Date();
     user.isLoggedIn = true;
 
-    try {
-      const response = await axios.get("https://api.ipify.org?format=json"); //사용자의 공인ip를 받아오는 코드
-      const ipAddress = response.data.ip;
-      user.ipAddress = ipAddress;
-    } catch (ipError) {
-      console.error("IP 주소를 가져오는 중 오류 발생:", ipError.message);
-    }
+    // try {
+    //   const response = await axios.get("https://api.ipify.org?format=json"); //사용자의 공인ip를 받아오는 코드
+    //   const ipAddress = response.data.ip;
+    //   user.ipAddress = ipAddress;
+    // } catch (ipError) {
+    //   console.error("IP 주소를 가져오는 중 오류 발생:", ipError.message);
+    // }
 
     await user.save();
 
@@ -101,14 +102,66 @@ router.post("/login", async (req, res) => {
 
     const userWithoutPassword = user.toObject();
     delete userWithoutPassword.password;
-    /*클라이언트로 보내는 json 데이터에서 패스워드 부분을 지우기
-      이는 패스워드가 노출되는 위험을 없애기 위함
-    */
+    // /*클라이언트로 보내는 json 데이터에서 패스워드 부분을 지우기
+    //   이는 패스워드가 노출되는 위험을 없애기 위함
+    // */
 
     res.json({ user: userWithoutPassword });
   } catch (error) {
     console.error("서버 오류:", error.message);
     res.status(500).json({ message: "서버 오류가 발생했습니다." });
+  }
+});
+
+router.post("/logout", async (req, res) => {
+  try {
+    const token = req.cookies.token;
+
+    if (!token) {
+      return res.status(400).json({ message: "이미 로그아웃된 상태입니다." });
+      //400에러는 클라이언트가 보낸 요청(request)에 문제가 있어서 서버가 처리할 수 없는 상태
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      //클라이언트 토큰과 env의 토큰 값을 비교하여 검증
+
+      const user = await User.findById(decoded.userId);
+
+      if (user) {
+        user.isLoggedIn = false;
+        await user.save();
+      }
+    } catch (error) {
+      console.log("토큰 검증 오류: ", error.message);
+    }
+
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+    });
+
+    res.json({ message: "로그아웃되었습니다." });
+  } catch (error) {
+    console.log("로그아웃 오류: ", error.message);
+    res.status(500).json({ message: "서버 오류가 발생했습니다." });
+  }
+});
+
+router.post("/verify-token", (req, res) => {
+  const token = req.cookies.token;
+  // console.log("token확인::",token);
+
+  if (!token) {
+    return res.status(400).json({ isValid: false, message: "토큰이 유효하지 않습니다." });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return res.status(200).json({ isValid: true, user: decoded });
+  } catch (error) {
+    return res.status(401).json({ isValid: false, message: "유효하지 않은 토큰입니다." });
   }
 });
 

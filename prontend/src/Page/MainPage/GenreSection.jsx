@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, Building } from "lucide-react";
+import Pagination from "../../Components/Pagination/Pagination";
 
 /* =======================
    상수
@@ -16,16 +17,13 @@ const seasonOptions = [
 
 const currentYear = new Date().getFullYear();
 const yearOptions = [];
-for (let y = currentYear; y >= 2010; y--) {
-  yearOptions.push(y);
-}
+for (let y = currentYear; y >= 2010; y--) yearOptions.push(y);
 
-// 현재 계절 계산
 const getCurrentSeason = () => {
   const month = new Date().getMonth() + 1;
-  if (month >= 1 && month <= 3) return "winter";
-  if (month >= 4 && month <= 6) return "spring";
-  if (month >= 7 && month <= 9) return "summer";
+  if (month <= 3) return "winter";
+  if (month <= 6) return "spring";
+  if (month <= 9) return "summer";
   return "fall";
 };
 
@@ -33,7 +31,6 @@ const getCurrentSeason = () => {
    Skeleton
 ======================= */
 const AnimeCardSkeleton = () => (
-  // animate-pulse => Tailwind CSS에서 제공하는 애니메이션 유틸리티 클래스
   <div className="rounded-3xl bg-white shadow-xl overflow-hidden animate-pulse">
     <div className="h-52 bg-gray-200" />
     <div className="p-6 space-y-3">
@@ -70,7 +67,6 @@ const GenreSection = () => {
   /* ---------- 페이지네이션 ---------- */
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
-  const maxPageButtons = 5;
 
   /* ---------- 번역 ---------- */
   const translateText = async (text) => {
@@ -95,7 +91,6 @@ const GenreSection = () => {
 
       try {
         const url = `https://api.jikan.moe/v4/seasons/${selectedYear}/${selectedSeason}`;
-
         const res = await fetch(url);
         const json = await res.json();
 
@@ -141,29 +136,8 @@ const GenreSection = () => {
   const filteredList =
     selectedGenres.length === 0 ? animeList : animeList.filter((a) => a.genre.some((g) => selectedGenres.includes(g)));
 
-  /* ---------- 페이지네이션 계산 ---------- */
-  const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+  /* ---------- 현재 페이지 아이템 ---------- */
   const currentItems = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const getPageNumbers = () => {
-    const pages = [];
-    let start = Math.max(currentPage - 2, 1);
-    let end = Math.min(start + maxPageButtons - 1, totalPages);
-
-    if (start > 1) {
-      pages.push(1);
-      if (start > 2) pages.push("...");
-    }
-
-    for (let i = start; i <= end; i++) pages.push(i);
-
-    if (end < totalPages) {
-      if (end < totalPages - 1) pages.push("...");
-      pages.push(totalPages);
-    }
-
-    return pages;
-  };
 
   /* =======================
      Render
@@ -172,7 +146,7 @@ const GenreSection = () => {
     <div className="container mx-auto px-4 py-20">
       <h1 className="text-3xl font-bold mb-6">장르 · 분기별 작품</h1>
 
-      {/* 분기 / 연도 */}
+      {/* 분기 / 연도 선택 */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <select
           value={selectedSeason}
@@ -199,7 +173,7 @@ const GenreSection = () => {
         </select>
       </div>
 
-      {/* 장르 */}
+      {/* 장르 선택 */}
       <div className="flex flex-wrap gap-3 mb-10">
         {genresList.map((g) => (
           <button
@@ -237,12 +211,9 @@ const GenreSection = () => {
                 onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
                 className="bg-white rounded-2xl shadow-lg cursor-pointer hover:shadow-xl"
               >
-                {/* 이미지 영역 */}
                 <div className="h-52 w-full overflow-hidden rounded-t-2xl bg-gray-200">
                   <img src={anime.image} alt={anime.title} className="w-full h-full object-cover" />
                 </div>
-
-                {/* 텍스트 영역 */}
                 <div className="p-4">
                   <h3 className="font-bold mb-2 line-clamp-1">{anime.title}</h3>
                   <div className="flex flex-wrap gap-1 mb-2">
@@ -268,25 +239,12 @@ const GenreSection = () => {
           </div>
 
           {/* 페이지네이션 */}
-          {totalPages > 1 && (
-            <div className="flex justify-center mt-10 gap-2 flex-wrap">
-              {getPageNumbers().map((p, i) =>
-                p === "..." ? (
-                  <span key={i} className="px-2 text-gray-400">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    onClick={() => setCurrentPage(p)}
-                    className={`px-3 py-1 rounded-2xl ${currentPage === p ? "bg-red-600 text-white" : "bg-gray-200"}`}
-                  >
-                    {p}
-                  </button>
-                )
-              )}
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredList.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
         </>
       )}
     </div>

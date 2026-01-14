@@ -1,97 +1,106 @@
-import React, { useState } from "react";
+import React from "react";
 
-function Board() {
-  const [posts, setPosts] = useState([
-    { title: "첫 번째 게시글", author: "관리자", date: "2026-01-06", views: 12 },
-    { title: "추천 애니 알려주세요", author: "유저1", date: "2026-01-05", views: 34 },
-  ]);
+const Board = () => {
+  const notices = [
+    {
+      id: "공지",
+      category: "공지",
+      title: "인벤 게시판 이용 규칙 안내",
+      author: "INVEN",
+      date: "01-10",
+      views: 9999,
+      comments: 32,
+      recommend: 12,
+      isNotice: true,
+    },
+  ];
 
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ title: "", author: "", content: "" });
+  const posts = [
+    {
+      id: 1,
+      category: "자유",
+      title: "이번 패치 밸런스 솔직 후기",
+      author: "검성유저",
+      date: "01-15",
+      views: 812,
+      comments: 18,
+      recommend: 7,
+    },
+    {
+      id: 2,
+      category: "질문",
+      title: "뉴비 직업 뭐가 제일 무난함?",
+      author: "뉴비123",
+      date: "01-15",
+      views: 402,
+      comments: 9,
+      recommend: 2,
+    },
+    {
+      id: 3,
+      category: "자유",
+      title: "애니메이션 연출 이 정도면 괜찮지 않음?",
+      author: "프론트장인",
+      date: "01-14",
+      views: 231,
+      comments: 4,
+      recommend: 1,
+    },
+  ];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const newPost = {
-      title: formData.title,
-      author: formData.author,
-      content: formData.content,
-      date: new Date().toLocaleDateString(),
-      views: 0,
-    };
-    setPosts([newPost, ...posts]);
-    setFormData({ title: "", author: "", content: "" });
-    setShowForm(false);
-  };
+  const allPosts = [...notices, ...posts];
 
   return (
-    <section className="space-y-6 min-h-96 mt-9">
-      {/* 게시판 헤더 */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-800">게시판</h2>
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
-          onClick={() => setShowForm(!showForm)}
-        >
-          새 글 작성
-        </button>
-      </div>
+    <div className="max-w-6xl mx-auto p-6 text-sm bg-gray-50">
+      <h1 className="text-2xl font-bold mb-4 border-b border-gray-300 pb-2">자유 게시판</h1>
 
-      {/* 새 글 작성 폼 */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white shadow-md rounded p-6 space-y-4">
-          <input
-            type="text"
-            placeholder="제목"
-            className="w-full border-gray-300 border rounded p-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            required
-          />
-          <input
-            type="text"
-            placeholder="작성자"
-            className="w-full border-gray-300 border rounded p-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-            value={formData.author}
-            onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-            required
-          />
-          <textarea
-            placeholder="내용"
-            rows={4}
-            className="w-full border-gray-300 border rounded p-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-            value={formData.content}
-            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-            required
-          />
-          <div className="flex justify-end space-x-2">
-            <button
-              type="button"
-              className="px-4 py-2 border rounded hover:bg-gray-100 transition"
-              onClick={() => setShowForm(false)}
-            >
-              취소
-            </button>
-            <button type="submit" className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">
-              작성
-            </button>
-          </div>
-        </form>
-      )}
+      <div className="border border-gray-300 bg-white shadow-sm">
+        <div className="grid grid-cols-12 bg-gray-100 font-semibold text-gray-700 border-b">
+          <div className="col-span-1 text-center py-2">번호</div>
+          <div className="col-span-2 text-center py-2">말머리</div>
+          <div className="col-span-5 py-2">제목</div>
+          <div className="col-span-2 text-center py-2">작성자</div>
+          <div className="col-span-1 text-center py-2">날짜</div>
+          <div className="col-span-1 text-center py-2">조회</div>
+        </div>
 
-      {/* 게시글 리스트 */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {posts.map((post, index) => (
-          <div key={index} className="bg-white shadow rounded p-4 hover:shadow-md transition">
-            <h3 className="text-lg font-semibold text-gray-800">{post.title}</h3>
-            <p className="text-gray-600 text-sm mt-1">
-              작성자: {post.author} | 날짜: {post.date}
-            </p>
-            <p className="text-gray-500 text-sm mt-2">조회수: {post.views}</p>
+        {allPosts.map((post) => (
+          <div
+            key={post.id}
+            className={`grid grid-cols-12 items-center border-b hover:bg-gray-50 ${
+              post.isNotice ? "bg-yellow-50 font-semibold" : ""
+            }`}
+          >
+            <div className="col-span-1 text-center py-2 text-gray-600">{post.isNotice ? "공지" : post.id}</div>
+            <div className="col-span-2 text-center py-2 text-blue-600">[{post.category}]</div>
+            <div className="col-span-5 py-2 flex items-center gap-2 overflow-hidden">
+              <span className="truncate">{post.title}</span>
+              {post.comments > 0 && <span className="text-orange-500">[{post.comments}]</span>}
+              {post.recommend >= 5 && (
+                <span className="text-red-500 text-xs border border-red-400 px-1 rounded">추천</span>
+              )}
+            </div>
+            <div className="col-span-2 text-center py-2 text-gray-700">{post.author}</div>
+            <div className="col-span-1 text-center py-2 text-gray-500">{post.date}</div>
+            <div className="col-span-1 text-center py-2 text-gray-500">{post.views}</div>
           </div>
         ))}
       </div>
-    </section>
+
+      <div className="flex justify-between items-center mt-6">
+        <div className="flex gap-1 text-sm">
+          <button className="px-2 py-1 border hover:bg-gray-100 transition">◀</button>
+          <button className="px-3 py-1 border bg-gray-800 text-white">1</button>
+          <button className="px-3 py-1 border hover:bg-gray-100 transition">2</button>
+          <button className="px-2 py-1 border hover:bg-gray-100 transition">▶</button>
+        </div>
+
+        <button className="px-5 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-all hover:scale-105">
+          글쓰기
+        </button>
+      </div>
+    </div>
   );
-}
+};
 
 export default Board;

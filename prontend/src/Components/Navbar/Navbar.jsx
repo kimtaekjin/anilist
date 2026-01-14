@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
 const Navbar = () => {
-  const { isLogin, logout, token, user } = useAuth();
+  const { isLogin, logout, user } = useAuth();
   const navigate = useNavigate();
 
   const menuItems = [

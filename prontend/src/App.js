@@ -1,8 +1,8 @@
 import "./App.css";
-import Navbar from "./Components/Navbar";
+import Navbar from "./Components/Navbar/Navbar";
 import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import Footer from "./Components/Foorter";
+import Footer from "./Components/Footer/Foorter";
 import MainPage from "./Page/MainPage/MainPage";
 import Trending from "./Page/MainPage/Trending";
 import Upcoming from "./Page/MainPage/Upcoming";
@@ -51,7 +51,7 @@ const route = createBrowserRouter([
         element: <GenreSection />,
       },
       {
-        path: "/AnimeDetail",
+        path: "/AnimeDetail/:id",
         element: <AnimeDetail />,
       },
       {

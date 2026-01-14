@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 // Skeleton 카드
 const AnimeCardSkeleton = () => (
@@ -50,6 +51,8 @@ const Airing = () => {
         const res = await fetch("https://api.jikan.moe/v4/seasons/now");
         const json = await res.json();
 
+        // console.log("애니정보:", json);
+
         const days = { 월: [], 화: [], 수: [], 목: [], 금: [], 토: [], 일: [] };
 
         // 번역 + 데이터 가공 병렬 처리
@@ -80,6 +83,7 @@ const Airing = () => {
 
         days["전체"] = Object.values(days).flat();
 
+        console.log("애니정보:", days);
         setSchedule(days);
         setTranslated(newTranslated);
       } catch (err) {
@@ -93,6 +97,13 @@ const Airing = () => {
   }, []);
 
   const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
+
+  const seasonToQuarter = {
+    winter: "1분기",
+    spring: "2분기",
+    summer: "3분기",
+    fall: "4분기",
+  };
 
   return (
     <div className="container mx-auto px-4 py-20">
@@ -119,21 +130,25 @@ const Airing = () => {
           ? // Skeleton 8개 출력
             Array.from({ length: 8 }).map((_, i) => <AnimeCardSkeleton key={i} />)
           : schedule[selectedDay].map((anime) => (
-              <div
-                key={anime.mal_id}
-                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition"
-              >
-                <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
-                <div className="p-4">
-                  <h3 className="font-bold text-lg mb-1 line-clamp-1">
-                    {translated[anime.mal_id]?.title || anime.title}
-                  </h3>
-                  <div className="flex justify-between text-sm text-gray-400">
-                    <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
-                    <span>{anime.episodes ? "화" : "미방"}</span>
+              <Link to={`/AnimeDetail/${anime.mal_id}`}>
+                <div
+                  key={anime.mal_id}
+                  className="bg-white cursor-pointer rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition "
+                >
+                  <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
+                  <div className="p-4">
+                    <h3 className="font-bold text-lg mb-1 line-clamp-1">
+                      {translated[anime.mal_id]?.title || anime.title}
+                    </h3>
+                    <div className="flex justify-between text-sm text-gray-400">
+                      <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
+                      <span className="text-sm text-gray-500">
+                        {anime.season ? `${seasonToQuarter[anime.season]}` : ""}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
       </div>
     </div>

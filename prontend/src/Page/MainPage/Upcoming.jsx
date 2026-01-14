@@ -96,7 +96,8 @@ const Upcoming = () => {
           {animeList.map((anime, idx) => (
             <div
               key={anime.mal_id}
-              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition"
+              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition
+              cursor-pointer"
             >
               {/* 이미지 */}
               {anime.image && (

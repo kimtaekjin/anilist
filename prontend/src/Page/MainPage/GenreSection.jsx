@@ -33,8 +33,9 @@ const getCurrentSeason = () => {
    Skeleton
 ======================= */
 const AnimeCardSkeleton = () => (
+  // animate-pulse => Tailwind CSS에서 제공하는 애니메이션 유틸리티 클래스
   <div className="rounded-3xl bg-white shadow-xl overflow-hidden animate-pulse">
-    <div className="h-64 bg-gray-200" />
+    <div className="h-52 bg-gray-200" />
     <div className="p-6 space-y-3">
       <div className="h-5 bg-gray-200 rounded w-3/4" />
       <div className="h-4 bg-gray-200 rounded w-full" />

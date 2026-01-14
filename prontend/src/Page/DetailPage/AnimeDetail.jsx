@@ -76,7 +76,7 @@ const AnimeDetail = () => {
         });
 
         const json = await res.json();
-        console.log("데이터확인:", json);
+        // console.log("데이터확인:", json);
         setAnime(json.data.Media);
       } catch (err) {
         console.error("AniList fetch error:", err);
@@ -88,7 +88,41 @@ const AnimeDetail = () => {
     fetchAnime();
   }, [id]);
 
-  if (loading) return <p className="text-center py-20">Loading...</p>;
+  const AnimeDetailSkeleton = () => {
+    return (
+      <div className="container mx-auto px-4 py-10 animate-pulse">
+        {/* 배너 */}
+        <div className="w-full h-72 bg-gray-200 rounded-2xl mb-6" />
+
+        {/* 상단 정보 */}
+        <div className="flex flex-col md:flex-row gap-6 mb-6">
+          {/* 커버 이미지 */}
+          <div className="w-56 h-80 bg-gray-200 rounded-xl shadow-lg" />
+
+          {/* 텍스트 영역 */}
+          <div className="flex-1 space-y-4">
+            {/* 제목 */}
+            <div className="h-8 bg-gray-200 rounded w-3/4" />
+
+            {/* 시즌 / 상태 */}
+            <div className="h-4 bg-gray-200 rounded w-1/2" />
+
+            {/* 평점 */}
+            <div className="h-5 bg-gray-200 rounded w-32" />
+
+            {/* 장르 */}
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="px-4 py-2 bg-gray-200 rounded-full w-20 h-6" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) return <AnimeDetailSkeleton />;
   if (!anime) return <p className="text-center py-20">데이터를 불러올 수 없습니다.</p>;
 
   // 🔥 현재 방영 화수 계산
@@ -115,8 +149,6 @@ const AnimeDetail = () => {
             ) : (
               `총 ${anime.episodes || "?"}화`
             )}
-            {/* {" · "} <Building size={14} className="text-gray-400" /> {anime.studios.edges[0]?.node.name || "미정"}
-            {" · "}Score: {anime.averageScore || "-"} */}
           </p>
           <div className="flex items-center gap-1">
             <Building size={14} className="text-gray-400" /> {anime.studios.edges[0]?.node.name || "미정"}

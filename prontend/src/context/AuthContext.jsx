@@ -7,7 +7,6 @@ export const AuthProvider = ({ children }) => {
   const [isLogin, setIsLogin] = useState(false);
   const [user, setUser] = useState(null);
 
-  // 앱 시작 시 로그인 상태 확인
   useEffect(() => {
     const checkAuth = async () => {
       try {

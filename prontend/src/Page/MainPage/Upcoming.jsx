@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { translateText } from "../../Components/items/translate";
 // Skeleton 카드
 const AnimeCardSkeleton = () => (
   <div className="rounded-3xl bg-white shadow-xl overflow-hidden animate-pulse">
@@ -17,21 +19,7 @@ const Upcoming = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [animeList, setAnimeList] = useState([]);
 
-  // 번역 함수
-  const translateText = async (text) => {
-    try {
-      const res = await fetch("http://localhost:3000/service/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, target: "ko" }),
-      });
-      const data = await res.json();
-      return data.translatedText || text;
-    } catch (err) {
-      console.error("Translation error:", err);
-      return text;
-    }
-  };
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUpcomingAnime = async () => {
@@ -96,6 +84,7 @@ const Upcoming = () => {
           {animeList.map((anime, idx) => (
             <div
               key={anime.mal_id}
+              onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
               className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition
               cursor-pointer"
             >

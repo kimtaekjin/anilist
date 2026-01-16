@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { translateText } from "../../Components/items/translate";
 
 // Skeleton 카드
 const AnimeCardSkeleton = () => (
@@ -14,44 +15,29 @@ const AnimeCardSkeleton = () => (
   </div>
 );
 
+const dayMap = {
+  Mondays: "월",
+  Tuesdays: "화",
+  Wednesdays: "수",
+  Thursdays: "목",
+  Fridays: "금",
+  Saturdays: "토",
+  Sundays: "일",
+};
+
 const Airing = () => {
   const [schedule, setSchedule] = useState({});
   const [selectedDay, setSelectedDay] = useState("전체");
   const [isLoading, setIsLoading] = useState(true);
   const [translated, setTranslated] = useState({});
 
-  const dayMap = {
-    Mondays: "월",
-    Tuesdays: "화",
-    Wednesdays: "수",
-    Thursdays: "목",
-    Fridays: "금",
-    Saturdays: "토",
-    Sundays: "일",
-  };
-
-  const translateText = async (text) => {
-    try {
-      const res = await fetch("http://localhost:3000/service/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, target: "ko" }),
-      });
-      const data = await res.json();
-      return data.translatedText;
-    } catch (err) {
-      console.error("Translation error:", err);
-      return text;
-    }
-  };
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchAnimeSchedule = async () => {
       try {
         const res = await fetch("https://api.jikan.moe/v4/seasons/now");
         const json = await res.json();
-
-        // console.log("애니정보:", json);
 
         const days = { 월: [], 화: [], 수: [], 목: [], 금: [], 토: [], 일: [] };
 
@@ -83,7 +69,8 @@ const Airing = () => {
 
         days["전체"] = Object.values(days).flat();
 
-        console.log("애니정보:", days);
+        console.log(days);
+
         setSchedule(days);
         setTranslated(newTranslated);
       } catch (err) {
@@ -127,28 +114,28 @@ const Airing = () => {
       {/* 카드 그리드 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
         {isLoading
-          ? // Skeleton 8개 출력
-            Array.from({ length: 8 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-          : schedule[selectedDay].map((anime) => (
-              <Link to={`/AnimeDetail/${anime.mal_id}`}>
-                <div
-                  key={anime.mal_id}
-                  className="bg-white cursor-pointer rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition "
-                >
-                  <img src={anime.images.jpg.image_url} alt={anime.title} className="w-full h-48 object-cover" />
-                  <div className="p-4">
-                    <h3 className="font-bold text-lg mb-1 line-clamp-1">
+          ? Array.from({ length: 8 }).map((_, i) => <AnimeCardSkeleton key={i} />)
+          : schedule[selectedDay]?.map((anime) => (
+              <div
+                key={anime.mal_id}
+                onClick={() => navigate(`/AnimeDetail/${anime.mal_id}`)}
+                className="bg-white cursor-pointer rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition "
+              >
+                <img src={anime.images?.jpg?.image_url} alt={anime.title} className="w-full h-48 object-cover" />
+                <div className="p-4">
+                  <div className="h-12">
+                    <h3 className="font-bold text-base mb-1 line-clamp-2">
                       {translated[anime.mal_id]?.title || anime.title}
                     </h3>
-                    <div className="flex justify-between text-sm text-gray-400">
-                      <span>{anime.aired.from?.slice(0, 4) || "?"}년</span>
-                      <span className="text-sm text-gray-500">
-                        {anime.season ? `${seasonToQuarter[anime.season]}` : ""}
-                      </span>
-                    </div>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-400">
+                    <span>{anime.aired?.from?.slice(0, 4) || "?"}년</span>
+                    <span className="text-sm text-gray-500">
+                      {anime.season ? `${seasonToQuarter[anime.season]}` : ""}
+                    </span>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
       </div>
     </div>

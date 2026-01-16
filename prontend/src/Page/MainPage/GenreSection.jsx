@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, Building } from "lucide-react";
+import { translateText } from "../../Components/items/translate";
 import Pagination from "../../Components/Pagination/Pagination";
 
 /* =======================
@@ -49,11 +50,7 @@ const GenreSection = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   /* ---------- URL 기반 초기값 ---------- */
-  const initialGenres = useMemo(() => {
-    const g = searchParams.get("genre");
-    return g ? g.split(",") : [];
-  }, []);
-
+  const initialGenres = searchParams.get("genre")?.split(",") || [];
   const initialSeason = searchParams.get("season") || getCurrentSeason();
   const initialYear = Number(searchParams.get("year")) || currentYear;
 
@@ -63,25 +60,8 @@ const GenreSection = () => {
   const [selectedGenres, setSelectedGenres] = useState(initialGenres);
   const [selectedSeason, setSelectedSeason] = useState(initialSeason);
   const [selectedYear, setSelectedYear] = useState(initialYear);
-
-  /* ---------- 페이지네이션 ---------- */
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
-
-  /* ---------- 번역 ---------- */
-  const translateText = async (text) => {
-    try {
-      const res = await fetch("http://localhost:3000/service/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, target: "ko" }),
-      });
-      const data = await res.json();
-      return data.translatedText || text;
-    } catch {
-      return text;
-    }
-  };
 
   /* ---------- 데이터 로드 ---------- */
   useEffect(() => {
@@ -117,14 +97,13 @@ const GenreSection = () => {
     fetchAnime();
   }, [selectedSeason, selectedYear]);
 
-  /* ---------- URL 동기화 ---------- */
   useEffect(() => {
     const params = {};
     if (selectedGenres.length) params.genre = selectedGenres.join(",");
     if (selectedSeason) params.season = selectedSeason;
     if (selectedYear) params.year = selectedYear;
     setSearchParams(params);
-  }, [selectedGenres, selectedSeason, selectedYear]);
+  }, [selectedGenres, selectedSeason, selectedYear, setSearchParams]);
 
   /* ---------- 장르 토글 ---------- */
   const toggleGenre = (genre) => {
@@ -215,7 +194,9 @@ const GenreSection = () => {
                   <img src={anime.image} alt={anime.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4">
-                  <h3 className="font-bold mb-2 line-clamp-1">{anime.title}</h3>
+                  <div className="h-12">
+                    <h3 className="font-bold mb-2 line-clamp-2">{anime.title}</h3>
+                  </div>
                   <div className="flex flex-wrap gap-1 mb-2">
                     {anime.genre.map((g, i) => (
                       <span key={i} className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full">

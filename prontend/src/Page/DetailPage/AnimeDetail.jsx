@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Building } from "lucide-react";
+import { translateText } from "../../Components/items/translate";
 
 import StarRating from "../../Components/items/StarRating ";
 const AnimeDetail = () => {
@@ -76,8 +77,29 @@ const AnimeDetail = () => {
         });
 
         const json = await res.json();
-        // console.log("데이터확인:", json);
-        setAnime(json.data.Media);
+        const data = json.data.Media;
+
+        const translatedData = {
+          ...data,
+          title: data.title.native
+            ? await translateText(data.title.native)
+            : data.title.romaji || data.title.english || "제목 없음",
+          description: data.description ? await translateText(data.description) : "줄거리 정보 없음",
+          genres: data.genres ? await Promise.all(data.genres.map((g) => translateText(g))) : [],
+          characters: data.characters?.edges
+            ? await Promise.all(
+                data.characters.edges.map(async (edge) => ({
+                  role: edge.role,
+                  name: edge.node.name.full ? await translateText(edge.node.name.full) : "이름 없음",
+                  image: edge.node.image?.large ?? "/default-character.jpg",
+                }))
+              )
+            : [],
+        };
+
+        // console.log("데이터확인:", data);
+        console.log("제목확인:", translatedData);
+        setAnime(translatedData);
       } catch (err) {
         console.error("AniList fetch error:", err);
       } finally {
@@ -138,10 +160,10 @@ const AnimeDetail = () => {
 
       {/* 상단 정보 */}
       <div className="flex flex-col md:flex-row gap-6 mb-6 ">
-        <img src={anime.coverImage.extraLarge} alt={anime.title.romaji} className="w-56 rounded-xl shadow-lg" />
+        <img src={anime.coverImage.extraLarge} alt={anime.title} className="w-56 rounded-xl shadow-lg" />
 
         <div className="flex-1">
-          <h1 className="text-3xl font-bold mb-2">{anime.title.english || anime.title.romaji}</h1>
+          <h1 className="text-2xl font-bold mb-2">{anime.title || anime.title.romaji}</h1>
           <p className="text-gray-500 mb-4">
             {anime.season} {anime.seasonYear} ·{" "}
             {anime.status === "RELEASING" ? (
@@ -191,10 +213,10 @@ const AnimeDetail = () => {
       <div>
         <h2 className="text-2xl font-bold mb-4">캐릭터</h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-          {anime.characters.edges.map(({ node }) => (
-            <div key={node.name.full} className="text-center">
-              <img src={node.image.large} alt={node.name.full} className="w-full h-40 object-cover rounded-lg mb-1" />
-              <p className="text-sm">{node.name.full}</p>
+          {anime.characters.map((anime) => (
+            <div key={anime.name} className="text-center">
+              <img src={anime.image} alt={anime.name} className="w-full h-40 object-cover rounded-lg mb-1" />
+              <p className="text-sm">{anime.name}</p>
             </div>
           ))}
         </div>

@@ -16,25 +16,33 @@ router.use(express.json());
 // ----------------------
 router.post("/translate", async (req, res) => {
   const { text, target } = req.body;
-  const targetLang = target || "ko";
+  const targetLang = target?.trim() || "ko";
 
-  const originalText = text;
+  // console.log("확인:", text, " ", target);
+
+  if (!text || typeof text !== "string") {
+    return res.status(400).json({ error: "Invalid 'text' parameter" });
+  }
+
+  const originalText = text.trim();
   let sourceLang = "auto";
-  let textToTranslate = originalText;
+  let convertedText = originalText;
 
   try {
     // Romaji 감지 시 Katakana 변환
     if (isRomaji(originalText)) {
       sourceLang = "ja";
-      textToTranslate = romajiToKatakana(originalText);
-      // console.log("Katakana 변환:", textToTranslate, " 오리지날::", originalText);
+      convertedText = romajiToKatakana(originalText);
+
+      // console.log("확인용::", convertedText);
     }
 
-    // DB 캐시 확인
+    console.log(convertedText);
+
+    // DB 캐시 확인 (originalText + targetLang 기준)
     const cached = await Translation.findOne({
       originalText,
       targetLang,
-      sourceLang,
     });
 
     if (cached?.translatedText?.trim()) {
@@ -45,25 +53,31 @@ router.post("/translate", async (req, res) => {
     }
 
     // Google Translate 호출
-    let translatedText = await translate(textToTranslate, sourceLang, targetLang);
+    let translatedText = await translate(convertedText, sourceLang, targetLang);
 
-    // 번역 실패 시 재시도
-    if (sourceLang === "ja" && translationFailed(originalText, translatedText)) {
-      const retry = await translate(textToTranslate, "ja", targetLang);
+    // 번역 실패 시 재시도 (sourceLang="auto" 또는 "ja")
+    if (translationFailed(originalText, translatedText)) {
+      const retrySource = sourceLang === "ja" ? "auto" : sourceLang;
+      const retry = await translate(convertedText, retrySource, targetLang);
       if (!translationFailed(originalText, retry)) translatedText = retry;
     }
 
     translatedText = FallbackText(translatedText);
-    // DB 저장
+
+    // DB 저장 (originalText + targetLang 기준, convertedText도 기록)
     await Translation.findOneAndUpdate(
-      { originalText, targetLang, sourceLang },
-      { translatedText },
+      { originalText, targetLang },
+      {
+        translatedText,
+        sourceLang,
+        convertedText,
+      },
       { upsert: true, setDefaultsOnInsert: true }
     );
 
     res.json({ translatedText, cached: false });
   } catch (err) {
-    console.error("Translation API 오류:", err);
+    console.error("Translation API 또는 DB 오류:", err);
     res.status(500).json({ error: "Translation failed" });
   }
 });

@@ -71,17 +71,7 @@ function isRomaji(text) {
   return true;
 }
 
-// ----------------------
-// 번역 실패 감지
-// ----------------------
-function translationFailed(original, translated) {
-  if (!translated) return true;
-  const cleanOriginal = original.toLowerCase().replace(/\s+/g, "");
-  const cleanTranslated = translated.toLowerCase().replace(/\s+/g, "");
-  return cleanOriginal === cleanTranslated;
-}
-
-function FallbackText(translatedText) {
+function replaceMistranslation(translatedText) {
   if (!translatedText) return "";
 
   let fixed = translatedText.trim();
@@ -94,4 +84,4 @@ function FallbackText(translatedText) {
   return fixed;
 }
 
-module.exports = { romajiToKatakana, translate, isRomaji, translationFailed, FallbackText };
+module.exports = { romajiToKatakana, translate, isRomaji, replaceMistranslation };

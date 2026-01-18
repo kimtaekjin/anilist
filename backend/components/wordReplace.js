@@ -8,6 +8,10 @@ const wordReplacements = [
   { from: "행동", to: "액션" },
   { from: "미결", to: "반전" },
   { from: "신의 조화", to: "초자연" },
+  { from: "장례식 프리렌", to: "장송의 프리렌" },
+  { from: "약점 한사람마다", to: "약사의 혼잣말" },
+  { from: "&#39;", to: "" },
+  { from: ";", to: "" },
 ];
 
 module.exports = { wordReplacements };

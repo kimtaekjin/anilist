@@ -1,13 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Translation = require("../models/translation");
-const {
-  romajiToKatakana,
-  translate,
-  isRomaji,
-  translationFailed,
-  FallbackText,
-} = require("../components/translateItem");
+const { romajiToKatakana, translate, isRomaji, replaceMistranslation } = require("../components/translateItem");
 
 router.use(express.json());
 
@@ -17,8 +11,6 @@ router.use(express.json());
 router.post("/translate", async (req, res) => {
   const { text, target } = req.body;
   const targetLang = target?.trim() || "ko";
-
-  // console.log("확인:", text, " ", target);
 
   if (!text || typeof text !== "string") {
     return res.status(400).json({ error: "Invalid 'text' parameter" });
@@ -37,7 +29,7 @@ router.post("/translate", async (req, res) => {
       // console.log("확인용::", convertedText);
     }
 
-    console.log(convertedText);
+    // console.log(convertedText);
 
     // DB 캐시 확인 (originalText + targetLang 기준)
     const cached = await Translation.findOne({
@@ -55,14 +47,10 @@ router.post("/translate", async (req, res) => {
     // Google Translate 호출
     let translatedText = await translate(convertedText, sourceLang, targetLang);
 
-    // 번역 실패 시 재시도 (sourceLang="auto" 또는 "ja")
-    if (translationFailed(originalText, translatedText)) {
-      const retrySource = sourceLang === "ja" ? "auto" : sourceLang;
-      const retry = await translate(convertedText, retrySource, targetLang);
-      if (!translationFailed(originalText, retry)) translatedText = retry;
-    }
+    //오번역 된 단어 교체
+    translatedText = replaceMistranslation(translatedText);
 
-    translatedText = FallbackText(translatedText);
+    console.log("확인2:", originalText, " ", translatedText, " ", sourceLang);
 
     // DB 저장 (originalText + targetLang 기준, convertedText도 기록)
     await Translation.findOneAndUpdate(

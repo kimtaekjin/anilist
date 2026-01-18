@@ -4,7 +4,6 @@ import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Footer from "./Components/Footer/Foorter";
 import MainPage from "./Page/MainPage/MainPage";
-import Trending from "./Page/MainPage/Trending";
 import Upcoming from "./Page/MainPage/Upcoming";
 import GenreSection from "./Page/MainPage/GenreSection";
 import AnimeDetail from "./Page/DetailPage/AnimeDetail";
@@ -33,10 +32,6 @@ const route = createBrowserRouter([
       {
         index: true,
         element: <MainPage />,
-      },
-      {
-        path: "/trending",
-        element: <Trending />,
       },
       {
         path: "/Airing",

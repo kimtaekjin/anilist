@@ -112,9 +112,9 @@ function MainPageCard({ title, animeList }) {
                 </div>
                 {/* 배지: 평점 / 에피소드 */}
                 <div className="absolute top-2 left-2">
-                  {anime.episode && (
-                    <span className="bg-gray-200 text-xs px-2 py-0.5 rounded-full font-semibold text-gray-800">
-                      {anime.episode}화
+                  {anime.episodes && (
+                    <span className="bg-gray-50 text-xs px-2 py-0.5 rounded-full font-semibold text-gray-700">
+                      {anime.episodes}화
                     </span>
                   )}
                 </div>

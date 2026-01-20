@@ -21,16 +21,6 @@ router.post("/translate", async (req, res) => {
   let convertedText = originalText;
 
   try {
-    // Romaji 감지 시 Katakana 변환
-    if (isRomaji(originalText)) {
-      sourceLang = "ja";
-      convertedText = romajiToKatakana(originalText);
-
-      // console.log("확인용::", convertedText);
-    }
-
-    // console.log(convertedText);
-
     // DB 캐시 확인 (originalText + targetLang 기준)
     const cached = await Translation.findOne({
       originalText,
@@ -44,13 +34,23 @@ router.post("/translate", async (req, res) => {
       });
     }
 
+    // Romaji 감지 시 Katakana 변환
+    if (isRomaji(originalText)) {
+      sourceLang = "ja";
+      convertedText = romajiToKatakana(originalText);
+
+      // console.log("확인용::", convertedText);
+    }
+
+    // console.log(convertedText);
+
     // Google Translate 호출
     let translatedText = await translate(convertedText, sourceLang, targetLang);
 
     //오번역 된 단어 교체
     translatedText = replaceMistranslation(translatedText);
 
-    console.log("확인2:", originalText, " ", translatedText, " ", sourceLang);
+    // console.log("확인2:", originalText, " ", translatedText, " ", sourceLang);
 
     // DB 저장 (originalText + targetLang 기준, convertedText도 기록)
     await Translation.findOneAndUpdate(

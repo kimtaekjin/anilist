@@ -1,11 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { translateText } from "../../Components/items/translate";
+
+// 장르 한글 매핑
+const genreMapKR = {
+  Action: "액션",
+  Romance: "로맨스",
+  Fantasy: "판타지",
+  "Slice of Life": "일상",
+  Sports: "스포츠",
+  SciFi: "SF",
+  Adventure: "모험",
+  Comedy: "코미디",
+  Horror: "공포",
+  Mystery: "미스터리",
+};
+
 // Skeleton 카드
 const AnimeCardSkeleton = () => (
   <div className="rounded-3xl bg-white shadow-xl overflow-hidden animate-pulse">
-    <div className="h-60 bg-gray-200" />
+    <div className="aspect-[16/9] bg-gray-200" />
     <div className="p-6 space-y-2">
       <div className="h-5 bg-gray-200 rounded w-3/4" />
       <div className="h-4 bg-gray-200 rounded w-full" />
@@ -18,41 +32,73 @@ const AnimeCardSkeleton = () => (
 const Upcoming = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [animeList, setAnimeList] = useState([]);
-
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUpcomingAnime = async () => {
+      setIsLoading(true);
+
       try {
-        const res = await fetch("https://api.jikan.moe/v4/seasons/upcoming");
+        const query = `
+          query {
+            Page(perPage: 20) {
+              media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
+                id
+                title {
+                  romaji
+                  english
+                  native
+                }
+                coverImage {
+                  large
+                }
+                genres
+                startDate {
+                  year
+                  month
+                  day
+                }
+                studios(isMain: true) {
+                  nodes {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        `;
+
+        const res = await fetch("https://graphql.anilist.co", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query }),
+        });
+
         const json = await res.json();
 
-        console.log(json);
+        const data = json.data.Page.media.map((anime) => {
+          const startDate = anime.startDate.year
+            ? `${anime.startDate.year}-${String(anime.startDate.month || 1).padStart(2, "0")}-${String(
+                anime.startDate.day || 1
+              ).padStart(2, "0")}`
+            : "미정";
 
-        const translatedData = await Promise.all(
-          json.data.map(async (anime) => {
-            const titleKR = anime.title_japanese ? await translateText(anime.title_japanese) : anime.title;
-            const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "줄거리 정보 없음";
-            const genreKR = anime.genres
-              ? await Promise.all(anime.genres.map(async (g) => await translateText(g.name)))
-              : [];
+          const studio = anime.studios.nodes?.[0]?.name || "미정";
 
-            return {
-              id: anime.mal_id,
-              title: titleKR,
-              synopsis: synopsisKR,
-              image: anime.images?.jpg?.image_url,
-              genre: genreKR || [],
-              startDate: anime.aired?.from ? anime.aired.from.slice(0, 10) : "미정",
-              studio: anime.studios?.[0]?.name || "미정",
-            };
-          })
-        );
+          // 장르 한글 변환
+          const genresKR = anime.genres.map((g) => genreMapKR[g] || g);
 
-        // 중복 제거 (mal_id 기준)
-        const uniqueAnimeList = Array.from(new Map(translatedData.map((a) => [a.id, a])).values());
+          return {
+            id: anime.id,
+            title: anime.title.english || anime.title.romaji || anime.title.native,
+            image: anime.coverImage?.large,
+            genre: genresKR,
+            startDate,
+            studio,
+          };
+        });
 
-        setAnimeList(uniqueAnimeList);
+        setAnimeList(data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -81,36 +127,35 @@ const Upcoming = () => {
 
       {!isLoading && animeList.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {animeList.map((anime, idx) => (
+          {animeList.map((anime) => (
             <div
-              key={anime.mal_id}
+              key={anime.id}
               onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
-              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition
-              cursor-pointer"
+              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition cursor-pointer"
             >
               {/* 이미지 */}
               {anime.image && (
-                <img
-                  src={anime.image}
-                  alt={anime.title}
-                  className="w-full h-60 object-cover border-b border-gray-200"
-                />
+                <div className="aspect-[16/9] w-full overflow-hidden">
+                  <img src={anime.image} alt={anime.title} className="w-full h-full object-cover" />
+                </div>
               )}
 
               {/* 정보 */}
               <div className="p-6">
-                <h3 className="text-xl font-bold mb-2 text-gray-800">{anime.title}</h3>
+                <h3 className="text-xl font-bold mb-2 text-gray-800 line-clamp-2">{anime.title}</h3>
 
                 {/* 장르 */}
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {anime.genre.map((g) => (
-                    <span
-                      key={g} // 안전한 key
-                      className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold"
-                    >
+                  {anime.genre.slice(0, 3).map((g) => (
+                    <span key={g} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
                       {g}
                     </span>
                   ))}
+                  {anime.genre.length > 3 && (
+                    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                      +{anime.genre.length - 3}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center text-gray-500 text-sm mt-4 border-t border-gray-200 pt-2">

@@ -1,78 +1,31 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { translateText } from "../../Components/items/translate";
+import { fetchAiringAnime } from "../../Components/items/aniListQuery";
 
-// Skeleton 카드
 const AnimeCardSkeleton = () => (
   <div className="rounded-2xl bg-white shadow-lg overflow-hidden animate-pulse">
     <div className="h-48 bg-gray-200" />
     <div className="p-4 space-y-2">
       <div className="h-5 bg-gray-200 rounded w-3/4" />
       <div className="h-4 bg-gray-200 rounded w-full" />
-      <div className="h-4 bg-gray-200 rounded w-5/6" />
-      <div className="h-3 bg-gray-200 rounded w-1/3 mt-2" />
     </div>
   </div>
 );
 
-const dayMap = {
-  Mondays: "월",
-  Tuesdays: "화",
-  Wednesdays: "수",
-  Thursdays: "목",
-  Fridays: "금",
-  Saturdays: "토",
-  Sundays: "일",
-};
+const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
 
 const Airing = () => {
-  const [schedule, setSchedule] = useState({});
+  const [animeList, setAnimeList] = useState([]);
   const [selectedDay, setSelectedDay] = useState("전체");
   const [isLoading, setIsLoading] = useState(true);
-  const [translated, setTranslated] = useState({});
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchAnimeSchedule = async () => {
+    const fetchAiring = async () => {
       try {
-        const res = await fetch("https://api.jikan.moe/v4/seasons/now");
-        const json = await res.json();
-
-        const days = { 월: [], 화: [], 수: [], 목: [], 금: [], 토: [], 일: [] };
-
-        // 번역 + 데이터 가공 병렬 처리
-        const translatedList = await Promise.all(
-          json.data.map(async (anime) => {
-            const day = dayMap[anime.broadcast?.day];
-            if (day) days[day].push(anime);
-
-            const titleKR = anime.title_japanese ? await translateText(anime.title_japanese) : anime.title;
-
-            const synopsisKR = anime.synopsis ? await translateText(anime.synopsis) : "";
-
-            return {
-              id: anime.mal_id,
-              title: titleKR,
-              synopsis: synopsisKR,
-            };
-          })
-        );
-
-        const newTranslated = {};
-        translatedList.forEach((item) => {
-          newTranslated[item.id] = {
-            title: item.title,
-            synopsis: item.synopsis,
-          };
-        });
-
-        days["전체"] = Object.values(days).flat();
-
-        console.log(days);
-
-        setSchedule(days);
-        setTranslated(newTranslated);
+        const processed = await fetchAiringAnime();
+        setAnimeList(processed);
       } catch (err) {
         console.error(err);
       } finally {
@@ -80,23 +33,18 @@ const Airing = () => {
       }
     };
 
-    fetchAnimeSchedule();
+    fetchAiring();
   }, []);
 
-  const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
-
-  const seasonToQuarter = {
-    winter: "1분기",
-    spring: "2분기",
-    summer: "3분기",
-    fall: "4분기",
-  };
+  const filteredList = useMemo(() => {
+    if (selectedDay === "전체") return animeList;
+    return animeList.filter((anime) => anime.day === selectedDay);
+  }, [animeList, selectedDay]);
 
   return (
     <div className="container mx-auto px-4 py-20">
-      <h1 className="text-3xl font-bold mb-8 text-left">방영중 애니</h1>
+      <h1 className="text-3xl font-bold mb-8">방영중 애니</h1>
 
-      {/* 요일 선택 버튼 */}
       <div className="flex space-x-4 mb-8 overflow-x-auto scrollbar-hide">
         {days.map((day) => (
           <button
@@ -111,28 +59,21 @@ const Airing = () => {
         ))}
       </div>
 
-      {/* 카드 그리드 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
         {isLoading
           ? Array.from({ length: 8 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-          : schedule[selectedDay]?.map((anime) => (
+          : filteredList.map((anime) => (
               <div
-                key={anime.mal_id}
-                onClick={() => navigate(`/AnimeDetail/${anime.mal_id}`)}
-                className="bg-white cursor-pointer rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition "
+                key={anime.id}
+                onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
+                className="bg-white cursor-pointer rounded-2xl shadow-lg overflow-hidden"
               >
-                <img src={anime.images?.jpg?.image_url} alt={anime.title} className="w-full h-48 object-cover" />
+                <img src={anime.image} alt={anime.title} className="w-full h-48 object-cover" />
                 <div className="p-4">
-                  <div className="h-12">
-                    <h3 className="font-bold text-base mb-1 line-clamp-2">
-                      {translated[anime.mal_id]?.title || anime.title}
-                    </h3>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-400">
-                    <span>{anime.aired?.from?.slice(0, 4) || "?"}년</span>
-                    <span className="text-sm text-gray-500">
-                      {anime.season ? `${seasonToQuarter[anime.season]}` : ""}
-                    </span>
+                  <h3 className="font-bold text-base line-clamp-2 h-12">{anime.title}</h3>
+                  <div className="flex justify-between text-sm text-gray-400 mt-1">
+                    <span>{anime.year}년</span>
+                    <span>{anime.quarter}</span>
                   </div>
                 </div>
               </div>

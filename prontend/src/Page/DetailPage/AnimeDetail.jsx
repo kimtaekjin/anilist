@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Building } from "lucide-react";
-import { translateText } from "../../Components/items/translate";
+import { fetchDetailAnime } from "../../Components/items/aniListQuery";
 
 import StarRating from "../../Components/items/StarRating ";
 const AnimeDetail = () => {
@@ -11,91 +11,8 @@ const AnimeDetail = () => {
 
   useEffect(() => {
     const fetchAnime = async () => {
-      const query = `
-        query ($id: Int) {
-          Media(idMal: $id, type: ANIME) {
-            id
-            idMal
-            title {
-              romaji
-              english
-              native
-            }
-            description
-            coverImage {
-              extraLarge
-              large
-            }
-            bannerImage
-            genres
-            season
-            seasonYear
-            episodes
-            status
-            averageScore
-            popularity
-            studios {
-              edges {
-                node {
-                  name
-                }
-              }
-            }
-            nextAiringEpisode {
-              episode
-              airingAt
-            }
-            trailer {
-              id
-              site
-            }
-            characters(sort: ROLE, perPage: 6) {
-              edges {
-                role
-                node {
-                  name {
-                    full
-                  }
-                  image {
-                    large
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
-
       try {
-        const res = await fetch("https://graphql.anilist.co", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query,
-            variables: { id: Number(id) },
-          }),
-        });
-
-        const json = await res.json();
-        const data = json.data.Media;
-
-        const translatedData = {
-          ...data,
-          title: data.title.native
-            ? await translateText(data.title.native)
-            : data.title.romaji || data.title.english || "제목 없음",
-          description: data.description ? await translateText(data.description) : "줄거리 정보 없음",
-          genres: data.genres ? await Promise.all(data.genres.map((g) => translateText(g))) : [],
-          characters: data.characters?.edges
-            ? await Promise.all(
-                data.characters.edges.map(async (edge) => ({
-                  role: edge.role,
-                  name: edge.node.name.full ? await translateText(edge.node.name.full) : "이름 없음",
-                  image: edge.node.image?.large ?? "/default-character.jpg",
-                }))
-              )
-            : [],
-        };
+        const translatedData = await fetchDetailAnime(id);
 
         // console.log("데이터확인:", data);
         console.log("제목확인:", translatedData);

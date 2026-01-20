@@ -3,7 +3,7 @@ export const translateText = async (text) => {
     const res = await fetch("http://localhost:3000/service/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, target: "ko" }),
+      body: JSON.stringify({ text }),
     });
     const data = await res.json();
     return data.translatedText;

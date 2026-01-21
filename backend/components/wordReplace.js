@@ -7,7 +7,12 @@ const wordReplacements = [
   { from: "미결", to: "반전" },
   { from: "신의 조화", to: "초자연" },
   { from: "마호우 쇼조", to: "마법소녀" },
+  { from: "일상의 단면", to: "일상" },
   //장르 분류
+
+  { from: "이k히고 쿠로사키", to: "쿠로사키 이치고" },
+  { from: "우리 - 이시다", to: "우류 이시다" },
+  { from: "쥬그라m 하sk후아l스", to: "주그램 하쉬발트" },
 
   //애니 분류
   { from: "추시의 아이", to: "최애의 아이" },
@@ -20,9 +25,86 @@ const wordReplacements = [
   { from: "천과 치히로의 은폐", to: "센과 치히로의 행방불명" },
   { from: "루로니 검심", to: "바람의 검심" },
   { from: "첸소만", to: "체인소맨" },
-  { from: "리물 테 mpest", to: "리무르 템페스트" },
+  { from: "리물 템페스트", to: "리무르 템페스트" },
+  { from: "일곱 대죄", to: "일곱개의 대죄" },
+  { from: "표백제", to: "블리치" },
+  { from: "소방팀", to: "불꽃 소방대" },
+  { from: "내 영웅 아카데미아", to: "나의 히어로 아카데미아" },
+
+  {
+    from: "때때로 보소와 러시아어로 데레하는 옆의 아야씨",
+    to: "가끔씩 툭하고 러시아어로 부끄러워하는 옆자리의 아랴 양",
+  },
 
   { from: ["&#39;", ";", "&lt", "&gt", "&quot;"], to: "" },
 ];
 
-module.exports = { wordReplacements };
+const replacements = [
+  // 이름/특수 단어
+  ["viktoriya", "vikutoriya"],
+
+  // 복합 자음
+  ["ff", "fu"],
+  ["ll", "ru"],
+  ["ss", "su"],
+  ["tt", "tto"],
+  ["nn", "n"],
+  ["pp", "ppu"],
+  ["th", "su"],
+  ["ph", "f"],
+  ["ck", "k"],
+  ["ng", "ngu"],
+  ["qu", "ku"],
+  ["gh", "g"],
+  ["wh", "hu"],
+  ["wr", "ru"],
+  ["kn", "n"],
+
+  // 모음 변환
+  ["aa", "a-"],
+  ["ee", "i-"],
+  ["ii", "i-"],
+  ["oo", "o-"],
+  ["uu", "u-"],
+
+  // 이중 모음
+  ["ou", "ou"],
+  ["au", "au"],
+  ["oi", "oi"],
+  ["ai", "ai"],
+  ["ei", "ei"],
+
+  // y 관련
+  ["iy", "i"],
+  ["ya", "ya"],
+  ["yu", "yu"],
+  ["yo", "yo"],
+  ["rya", "rya"],
+
+  // r 변환
+  ["bri", "buri"],
+  ["ov", "ofu"],
+  ["ev", "efu"],
+  ["ski", "suki"],
+
+  // 단일 자음
+  ["v", "vu"],
+  ["w", "u"],
+  ["r", "r"],
+  ["y", "i"],
+  ["c", "k"],
+  ["x", "ks"],
+  ["z", "z"],
+  ["g", "g"],
+  ["j", "j"],
+  ["k", "k"],
+  ["b", "b"],
+  ["d", "d"],
+  ["t", "t"],
+  ["p", "p"],
+
+  // ch/sh 등
+  ["ch", "ch"],
+  ["sh", "sh"],
+];
+module.exports = { wordReplacements, replacements };

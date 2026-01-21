@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { fetchUpcommingAnime } from "../../Components/items/aniListQuery";
 
-// 장르 한글 매핑
-const genreMapKR = {
-  Action: "액션",
-  Romance: "로맨스",
-  Fantasy: "판타지",
-  "Slice of Life": "일상",
-  Sports: "스포츠",
-  SciFi: "SF",
-  Adventure: "모험",
-  Comedy: "코미디",
-  Horror: "공포",
-  Mystery: "미스터리",
-};
+// const genreMapKR = {
+//   Action: "액션",
+//   Romance: "로맨스",
+//   Fantasy: "판타지",
+//   "Slice of Life": "일상",
+//   Sports: "스포츠",
+//   SciFi: "SF",
+//   Adventure: "모험",
+//   Comedy: "코미디",
+//   Horror: "공포",
+//   Mystery: "미스터리",
+// };
 
 // Skeleton 카드
 const AnimeCardSkeleton = () => (
@@ -39,65 +39,7 @@ const Upcoming = () => {
       setIsLoading(true);
 
       try {
-        const query = `
-          query {
-            Page(perPage: 20) {
-              media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
-                id
-                title {
-                  romaji
-                  english
-                  native
-                }
-                coverImage {
-                  large
-                }
-                genres
-                startDate {
-                  year
-                  month
-                  day
-                }
-                studios(isMain: true) {
-                  nodes {
-                    name
-                  }
-                }
-              }
-            }
-          }
-        `;
-
-        const res = await fetch("https://graphql.anilist.co", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
-        });
-
-        const json = await res.json();
-
-        const data = json.data.Page.media.map((anime) => {
-          const startDate = anime.startDate.year
-            ? `${anime.startDate.year}-${String(anime.startDate.month || 1).padStart(2, "0")}-${String(
-                anime.startDate.day || 1
-              ).padStart(2, "0")}`
-            : "미정";
-
-          const studio = anime.studios.nodes?.[0]?.name || "미정";
-
-          // 장르 한글 변환
-          const genresKR = anime.genres.map((g) => genreMapKR[g] || g);
-
-          return {
-            id: anime.id,
-            title: anime.title.english || anime.title.romaji || anime.title.native,
-            image: anime.coverImage?.large,
-            genre: genresKR,
-            startDate,
-            studio,
-          };
-        });
-
+        const data = await fetchUpcommingAnime();
         setAnimeList(data);
       } catch (err) {
         console.error(err);

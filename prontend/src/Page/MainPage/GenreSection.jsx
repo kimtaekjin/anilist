@@ -187,7 +187,11 @@ const GenreSection = () => {
                       </span>
                     ))}
 
-                    {anime.genre.length > 3 && <span className="text-sm px-1 py-0.5  text-red-600 ">...</span>}
+                    {anime.genre.length > 3 && (
+                      <span className="px-[5px] py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                        +{anime.genre.length - 3}
+                      </span>
+                    )}
                   </div>
 
                   <div className="text-sm text-gray-400 flex justify-between h-7">

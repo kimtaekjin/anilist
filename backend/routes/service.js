@@ -38,11 +38,8 @@ router.post("/translate", async (req, res) => {
     if (isRomaji(originalText)) {
       sourceLang = "ja";
       convertedText = romajiToKatakana(originalText);
-
-      // console.log("확인용::", convertedText);
+      console.log(convertedText);
     }
-
-    // console.log(convertedText);
 
     // Google Translate 호출
     let translatedText = await translate(convertedText, sourceLang, targetLang);

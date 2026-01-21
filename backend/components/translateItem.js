@@ -1,7 +1,7 @@
 const GOOGLE_KEY = process.env.GOOGLETRANSLATION;
 const fetch = require("node-fetch");
 const wanakana = require("wanakana");
-const { wordReplacements } = require("./wordReplace");
+const { wordReplacements, replacements } = require("./wordReplace");
 
 // ----------------------
 // Romaji → Katakana 변환 (숫자+영어 혼합 안전 처리)
@@ -9,6 +9,13 @@ const { wordReplacements } = require("./wordReplace");
 
 function romajiToKatakana(text) {
   if (!text) return "";
+
+  text = text.toLowerCase(text);
+  console.log("원본::", text);
+
+  for (const [pattern, repl] of replacements) {
+    text = text.replace(new RegExp(pattern, "g"), repl);
+  }
 
   // 특수 패턴 처리 (예: 1st, 2nd → 第1シーズン)
   const specialPatterns = [{ regex: /(\d+)(st|nd|rd|th)/gi, replace: (_, num) => `第${num}シーズン` }];

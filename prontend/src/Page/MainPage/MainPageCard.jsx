@@ -83,13 +83,13 @@ function MainPageCard({ title, animeList }) {
       {/* 좌우 버튼 */}
       <button
         onClick={scrollLeft}
-        className="absolute left-0 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full z-10 hover:bg-black/70 transition"
+        className="absolute left-0 top-1/2 -translate-y-1/5 bg-black bg-opacity-50 text-white p-2 rounded-full z-10 hover:bg-black/70 transition"
       >
         ◀
       </button>
       <button
         onClick={scrollRight}
-        className="absolute right-0 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full z-10 hover:bg-black/70 transition"
+        className="absolute right-0 top-1/2 -translate-y-1/5 bg-black bg-opacity-50 text-white p-2 rounded-full z-10 hover:bg-black/70 transition"
       >
         ▶
       </button>

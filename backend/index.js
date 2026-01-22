@@ -9,6 +9,7 @@ require("dotenv").config();
 
 const service = require("./routes/service");
 const user = require("./routes/user");
+const post = require("./routes/post");
 
 app.use(cookieParser());
 
@@ -21,6 +22,7 @@ app.use(
 
 app.use("/service", service);
 app.use("/user", user);
+app.use("/post", post);
 
 mongoose
   .connect(process.env.MONGO_URI)

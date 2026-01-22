@@ -14,6 +14,8 @@ const AnimeCardSkeleton = () => (
 
 const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
 
+const CACHE_DURATION = 24 * 60 * 60 * 1000;
+
 const Airing = () => {
   const [animeList, setAnimeList] = useState([]);
   const [selectedDay, setSelectedDay] = useState("전체");
@@ -24,8 +26,21 @@ const Airing = () => {
   useEffect(() => {
     const fetchAiring = async () => {
       try {
+        // const now = Date.now();
+
+        // const cachedAiring = JSON.parse(localStorage.getItem("animeList")) || { data: [], updated: 0 };
+
+        // console.log(cachedAiring.data);
+
+        // if (cachedAiring.data.length && now - cachedAiring.updated < CACHE_DURATION) {
+        //   setAnimeList(cachedAiring.data);
+        //   return;
+        // }
+
         const processed = await fetchAiringAnime();
         setAnimeList(processed);
+
+        // localStorage.setItem("animeList", JSON.stringify({ data: processed, updated: now }));
       } catch (err) {
         console.error(err);
       } finally {

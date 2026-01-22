@@ -29,6 +29,8 @@ const AnimeCardSkeleton = () => (
   </div>
 );
 
+const CACHE_DURATION = 24 * 60 * 60 * 1000;
+
 const Upcoming = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [animeList, setAnimeList] = useState([]);
@@ -39,8 +41,20 @@ const Upcoming = () => {
       setIsLoading(true);
 
       try {
+        const now = Date.now();
+        const cachedUpcomming = JSON.parse(localStorage.getItem("upcommingAnime")) || { data: [], updated: 0 };
+
+        console.log(cachedUpcomming.data);
+
+        // if (cachedUpcomming.data.length && now - cachedUpcomming.updated < CACHE_DURATION) {
+        //   setAnimeList(cachedUpcomming.data);
+        //   return;
+        // }
         const data = await fetchUpcommingAnime();
+        console.log(data);
+
         setAnimeList(data);
+        localStorage.setItem("upcommingAnime", JSON.stringify({ data: data, updated: now }));
       } catch (err) {
         console.error(err);
       } finally {

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Translation = require("../models/translation");
+const Translation = require("../models/Translation");
 const { romajiToKatakana, translate, isRomaji, replaceMistranslation } = require("../components/translateItem");
 
 router.use(express.json());
@@ -9,8 +9,8 @@ router.use(express.json());
 // 번역 라우트
 // ----------------------
 router.post("/translate", async (req, res) => {
-  const { text, target } = req.body;
-  const targetLang = target?.trim() || "ko";
+  const { text } = req.body;
+  const targetLang = "ko";
 
   if (!text || typeof text !== "string") {
     return res.status(400).json({ error: "Invalid 'text' parameter" });
@@ -53,9 +53,9 @@ router.post("/translate", async (req, res) => {
     await Translation.findOneAndUpdate(
       { originalText, targetLang },
       {
+        convertedText,
         translatedText,
         sourceLang,
-        convertedText,
       },
       { upsert: true, setDefaultsOnInsert: true }
     );

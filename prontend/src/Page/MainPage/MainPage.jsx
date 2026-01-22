@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { fetchTrendingAnime, fetchCompletedAnime, fetchOVAAnime } from "../../Components/items/aniListQuery";
 import MainPageCard from "./MainPageCard";
 
+const CACHE_DURATION = 24 * 60 * 60 * 1000;
+
 const MainPage = () => {
   const [trendingAnime, setTrendingAnime] = useState([]);
   const [completedAnime, setCompletedAnime] = useState([]);
   const [ovaAnime, setOvaAnime] = useState([]);
-
-  const CACHE_DURATION = 60 * 60 * 1000; // 10분
 
   useEffect(() => {
     const fetchAnime = async () => {
@@ -28,7 +28,6 @@ const MainPage = () => {
           setTrendingAnime(cachedTrending.data);
           setCompletedAnime(cachedCompleted.data);
           setOvaAnime(cachedOVA.data);
-          console.log("확인");
 
           return;
         }

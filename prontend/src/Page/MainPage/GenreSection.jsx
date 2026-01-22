@@ -50,6 +50,8 @@ const getCurrentSeason = () => {
   return "FALL";
 };
 
+const CACHE_DURATION = 24 * 60 * 60 * 1000;
+
 const GenreSection = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -64,16 +66,29 @@ const GenreSection = () => {
   const itemsPerPage = 12;
 
   /* ---------- 데이터 로드 ---------- */
+
   useEffect(() => {
     const fetchAnime = async () => {
       setIsLoading(true);
       setCurrentPage(1);
 
+      const now = Date.now();
+      const cacheKey = `genreAnime:${selectedSeason}:${selectedYear}`;
+
       try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey));
+
+        if (cached && now - cached.updated < CACHE_DURATION) {
+          setAnimeList(cached.data);
+          setIsLoading(false);
+          return;
+        }
+
         const processed = await fetchGenreAnime(selectedSeason, selectedYear);
-        console.log(processed);
 
         setAnimeList(processed);
+
+        localStorage.setItem(cacheKey, JSON.stringify({ data: processed, updated: now }));
       } catch (e) {
         console.error(e);
       } finally {

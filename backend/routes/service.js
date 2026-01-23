@@ -7,6 +7,7 @@ router.use(express.json());
 
 // ----------------------
 // 번역 라우트
+
 // ----------------------
 router.post("/translate", async (req, res) => {
   const { text } = req.body;

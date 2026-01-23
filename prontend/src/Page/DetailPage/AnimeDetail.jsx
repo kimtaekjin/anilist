@@ -13,9 +13,6 @@ const AnimeDetail = () => {
     const fetchAnime = async () => {
       try {
         const translatedData = await fetchDetailAnime(id);
-
-        // console.log("데이터확인:", data);
-        console.log("제목확인:", translatedData);
         setAnime(translatedData);
       } catch (err) {
         console.error("AniList fetch error:", err);
@@ -84,9 +81,15 @@ const AnimeDetail = () => {
           <p className="text-gray-500 mb-4">
             {anime.season} {anime.seasonYear} ·{" "}
             {anime.status === "RELEASING" ? (
-              <span className="text-red-500 font-semibold">{currentEpisode}화 방영 중</span>
+              <span className="text-red-500 font-semibold">{currentEpisode}화 방영중</span>
             ) : (
-              `총 ${anime.episodes || "?"}화`
+              <span>
+                {anime.episodes
+                  ? `${anime.episodes}화 완결`
+                  : anime.startdate
+                  ? `${anime.startdate} 방영 예정`
+                  : "방영일 미정"}
+              </span>
             )}
           </p>
           <div className="flex items-center gap-1">

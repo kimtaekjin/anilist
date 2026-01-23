@@ -44,15 +44,13 @@ const Upcoming = () => {
         const now = Date.now();
         const cachedUpcomming = JSON.parse(localStorage.getItem("upcommingAnime")) || { data: [], updated: 0 };
 
-        console.log(cachedUpcomming.data);
+        // console.log("확인", cachedUpcomming.data);
 
-        // if (cachedUpcomming.data.length && now - cachedUpcomming.updated < CACHE_DURATION) {
-        //   setAnimeList(cachedUpcomming.data);
-        //   return;
-        // }
+        if (cachedUpcomming.data.length && now - cachedUpcomming.updated < CACHE_DURATION) {
+          setAnimeList(cachedUpcomming.data);
+          return;
+        }
         const data = await fetchUpcommingAnime();
-        console.log(data);
-
         setAnimeList(data);
         localStorage.setItem("upcommingAnime", JSON.stringify({ data: data, updated: now }));
       } catch (err) {
@@ -91,17 +89,19 @@ const Upcoming = () => {
             >
               {/* 이미지 */}
               {anime.image && (
-                <div className="aspect-[16/9] w-full overflow-hidden">
+                <div className="aspect-[4/3] w-full overflow-hidden">
                   <img src={anime.image} alt={anime.title} className="w-full h-full object-cover" />
                 </div>
               )}
 
               {/* 정보 */}
               <div className="p-6">
-                <h3 className="text-xl font-bold mb-2 text-gray-800 line-clamp-2">{anime.title}</h3>
+                <div className="h-14 mb-1">
+                  <h3 className="text-xl font-bold mb-2 text-gray-800 line-clamp-2">{anime.title}</h3>
+                </div>
 
                 {/* 장르 */}
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap gap-2 h-7 ">
                   {anime.genre.slice(0, 3).map((g) => (
                     <span key={g} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
                       {g}
@@ -114,10 +114,10 @@ const Upcoming = () => {
                   )}
                 </div>
 
-                <div className="flex justify-between items-center text-gray-500 text-sm mt-4 border-t border-gray-200 pt-2">
+                <div className="flex justify-between items-center text-gray-500 text-sm mt-1 border-t border-gray-200 pt-2">
                   <div className="flex items-center gap-1">
                     <Calendar size={14} className="text-gray-400" />
-                    <span>{anime.startDate}</span>
+                    <span>{anime.startDate ? anime.startDate : "미정"}</span>
                   </div>
 
                   <div className="flex items-center gap-1">

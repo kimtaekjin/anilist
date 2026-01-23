@@ -26,21 +26,20 @@ const Airing = () => {
   useEffect(() => {
     const fetchAiring = async () => {
       try {
-        // const now = Date.now();
+        const now = Date.now();
 
-        // const cachedAiring = JSON.parse(localStorage.getItem("animeList")) || { data: [], updated: 0 };
+        const cachedAiring = JSON.parse(localStorage.getItem("animeList")) || { data: [], updated: 0 };
 
         // console.log(cachedAiring.data);
 
-        // if (cachedAiring.data.length && now - cachedAiring.updated < CACHE_DURATION) {
-        //   setAnimeList(cachedAiring.data);
-        //   return;
-        // }
-
+        if (cachedAiring.data.length && now - cachedAiring.updated < CACHE_DURATION) {
+          setAnimeList(cachedAiring.data);
+          return;
+        }
         const processed = await fetchAiringAnime();
         setAnimeList(processed);
 
-        // localStorage.setItem("animeList", JSON.stringify({ data: processed, updated: now }));
+        localStorage.setItem("animeList", JSON.stringify({ data: processed, updated: now }));
       } catch (err) {
         console.error(err);
       } finally {
@@ -81,7 +80,8 @@ const Airing = () => {
               <div
                 key={anime.id}
                 onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
-                className="bg-white cursor-pointer rounded-2xl shadow-lg overflow-hidden"
+                className="bg-white cursor-pointer rounded-2xl shadow-lg overflow-hidden
+                hover:shadow-2xl transition"
               >
                 <img src={anime.image} alt={anime.title} className="w-full h-48 object-cover" />
                 <div className="p-4">

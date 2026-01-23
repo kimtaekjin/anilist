@@ -1,22 +1,9 @@
 import React, { useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 function MainPageCard({ title, animeList }) {
-  // const animeList = [
-  //   {
-  //     id: 1,
-  //     title: "애니1",
-  //     image: anime1,
-  //     episode: "2",
-  //     ReleaseYear: 2025,
-  //   },
-  //   { id: 2, title: "애니2", image: anime2, episode: "2", ReleaseYear: 2025 },
-  //   { id: 3, title: "애니3", image: anime3, episode: "2", ReleaseYear: 2025 },
-  //   { id: 4, title: "애니4", image: anime4, episode: "2", ReleaseYear: 2025 },
-  //   { id: 5, title: "애니5", image: anime5, episode: "2", ReleaseYear: 2025 },
-  //   { id: 6, title: "애니6", image: anime6, episode: "2", ReleaseYear: 2025 },
-  // ];
-
   const scrollRef = useRef(null);
+  const navigate = useNavigate();
 
   const scrollLeft = () => {
     if (scrollRef.current) {
@@ -38,10 +25,10 @@ function MainPageCard({ title, animeList }) {
   const scrollRight = () => {
     if (scrollRef.current) {
       const current = scrollRef.current.scrollLeft;
-      const maxScrollLeft = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
+      const maxScroll = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
 
       // 오른쪽 끝이면 처음으로
-      if (current >= maxScrollLeft) {
+      if (current >= maxScroll) {
         scrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
       } else {
         scrollRef.current.scrollBy({ left: 200, behavior: "smooth" });
@@ -54,9 +41,9 @@ function MainPageCard({ title, animeList }) {
 
     const autoScroll = () => {
       if (scrollRef.current) {
-        const maxScrollLeft = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
+        const maxScroll = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
 
-        if (scrollRef.current.scrollLeft >= maxScrollLeft) {
+        if (scrollRef.current.scrollLeft >= maxScroll) {
           scrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
         } else {
           scrollRef.current.scrollBy({ left: 200, behavior: "smooth" });
@@ -103,7 +90,8 @@ function MainPageCard({ title, animeList }) {
           : animeList.map((anime) => (
               <div
                 key={anime.id}
-                className="w-52 flex-shrink-0 rounded-2xl overflow-hidden shadow-lg relative  snap-start"
+                className="w-52 flex-shrink-0 rounded-2xl overflow-hidden shadow-lg relative  snap-start cursor-pointer"
+                onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
               >
                 <img src={anime.image} alt={anime.title} className="w-full h-72 object-cover" />
                 {/* 그라데이션 + 제목 */}

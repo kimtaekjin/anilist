@@ -1,4 +1,5 @@
-import React from "react";
+import axios from "axios";
+import React, { useEffect, useState } from "react";
 
 const Board = () => {
   const notices = [
@@ -15,40 +16,55 @@ const Board = () => {
     },
   ];
 
-  const posts = [
-    {
-      id: 1,
-      category: "자유",
-      title: "이번 패치 밸런스 솔직 후기",
-      author: "검성유저",
-      date: "01-15",
-      views: 812,
-      comments: 18,
-      recommend: 7,
-    },
-    {
-      id: 2,
-      category: "질문",
-      title: "뉴비 직업 뭐가 제일 무난함?",
-      author: "뉴비123",
-      date: "01-15",
-      views: 402,
-      comments: 9,
-      recommend: 2,
-    },
-    {
-      id: 3,
-      category: "자유",
-      title: "애니메이션 연출 이 정도면 괜찮지 않음?",
-      author: "프론트장인",
-      date: "01-14",
-      views: 231,
-      comments: 4,
-      recommend: 1,
-    },
-  ];
+  // const posts = [
+  //   {
+  //     id: 1,
+  //     category: "자유",
+  //     title: "이번 패치 밸런스 솔직 후기",
+  //     author: "검성유저",
+  //     date: "01-15",
+  //     views: 812,
+  //     comments: 18,
+  //     recommend: 7,
+  //   },
+  //   {
+  //     id: 2,
+  //     category: "질문",
+  //     title: "뉴비 직업 뭐가 제일 무난함?",
+  //     author: "뉴비123",
+  //     date: "01-15",
+  //     views: 402,
+  //     comments: 9,
+  //     recommend: 2,
+  //   },
+  //   {
+  //     id: 3,
+  //     category: "자유",
+  //     title: "애니메이션 연출 이 정도면 괜찮지 않음?",
+  //     author: "프론트장인",
+  //     date: "01-14",
+  //     views: 231,
+  //     comments: 4,
+  //     recommend: 1,
+  //   },
+  // ];
+  const [posts, setPosts] = useState([]);
 
   const allPosts = [...notices, ...posts];
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const { data } = await axios.get("http://localhost:3000/post");
+        console.log(data);
+        setPosts(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchPosts();
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto p-6 text-sm bg-gray-50">
@@ -71,7 +87,7 @@ const Board = () => {
               post.isNotice ? "bg-yellow-50 font-semibold" : ""
             }`}
           >
-            <div className="col-span-1 text-center py-2 text-gray-600">{post.isNotice ? "공지" : post.id}</div>
+            <div className="col-span-1 text-center py-2 text-gray-600">{post.isNotice ? "공지" : post.number}</div>
             <div className="col-span-2 text-center py-2 text-blue-600">[{post.category}]</div>
             <div className="col-span-5 py-2 flex items-center gap-2 overflow-hidden">
               <span className="truncate">{post.title}</span>

@@ -2,44 +2,31 @@ const mongoose = require("mongoose");
 
 const postSchema = new mongoose.Schema(
   {
-    number: {
-      type: Number,
-      required: true,
-    },
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    content: {
-      type: String,
-      required: true,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    views: {
-      type: Number,
-      default: 0,
-    },
+    number: { type: Number, required: true },
+    title: { type: String, required: true, trim: true },
+    content: { type: String, required: true },
+    author: { type: String, required: true }, // 작성자
+    category: { type: String, default: "자유" }, // 말머리
+    comments: [
+      {
+        author: String,
+        content: String,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ], // 댓글
+    recommend: { type: Number, default: 0 }, // 추천 수
+    isNotice: { type: Boolean, default: false }, // 공지 여부
+    views: { type: Number, default: 0 },
     viewLogs: [
       {
         ip: String,
         userAgent: String,
-        timestamp: {
-          type: Date,
-          default: Date.now,
-        },
+        timestamp: { type: Date, default: Date.now },
       },
     ],
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
-    timestamps: true,
+    timestamps: true, // createdAt, updatedAt 자동 생성
   }
 );
 

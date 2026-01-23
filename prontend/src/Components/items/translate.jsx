@@ -1,11 +1,8 @@
+import axios from "axios";
+
 export const translateText = async (text) => {
   try {
-    const res = await fetch("http://localhost:3000/service/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    const data = await res.json();
+    const { data } = await axios.post("http://localhost:3000/service/translate", { text });
     return data.translatedText;
   } catch (err) {
     console.error("Translation error:", err);

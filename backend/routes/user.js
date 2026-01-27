@@ -21,7 +21,6 @@ router.post("/singup", async (req, res) => {
       return res.status(400).json({ message: "이미 존재하는 닉네임입니다." });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("여기 오는지");
 
     const user = new User({
       email,
@@ -90,7 +89,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, email: user.email, userName: user.username }, //여기서 값을 넣을때는 몽고DB의 컬럼값을 기준으로 한다.
       process.env.JWT_SECRET, //jwt는 시크릿키를 발급하여 이를 통해 jwt토큰을 생성 및 유통을 한다.
-      { expiresIn: "24h" } //JWT의 유효기간
+      { expiresIn: "24h" }, //JWT의 유효기간
     );
 
     res.cookie("token", token, {
@@ -116,6 +115,7 @@ router.post("/login", async (req, res) => {
 router.post("/logout", async (req, res) => {
   try {
     const token = req.cookies.token;
+    console.log("확인:", token);
 
     if (!token) {
       return res.status(400).json({ message: "이미 로그아웃된 상태입니다." });

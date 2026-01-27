@@ -5,8 +5,8 @@ import { useAuth } from "../../context/AuthContext";
 
 const Board = () => {
   const navigate = useNavigate();
-  const { user, isLogin } = useAuth;
-  console.log("유저정보:", user, " 로그인췍:", isLogin);
+  const { user } = useAuth();
+  const [posts, setPosts] = useState([]);
 
   const notices = [
     {
@@ -22,42 +22,9 @@ const Board = () => {
     },
   ];
 
-  // const posts = [
-  //   {
-  //     id: 1,
-  //     category: "자유",
-  //     title: "이번 패치 밸런스 솔직 후기",
-  //     author: "검성유저",
-  //     date: "01-15",
-  //     views: 812,
-  //     comments: 18,
-  //     recommend: 7,
-  //   },
-  //   {
-  //     id: 2,
-  //     category: "질문",
-  //     title: "뉴비 직업 뭐가 제일 무난함?",
-  //     author: "뉴비123",
-  //     date: "01-15",
-  //     views: 402,
-  //     comments: 9,
-  //     recommend: 2,
-  //   },
-  //   {
-  //     id: 3,
-  //     category: "자유",
-  //     title: "애니메이션 연출 이 정도면 괜찮지 않음?",
-  //     author: "프론트장인",
-  //     date: "01-14",
-  //     views: 231,
-  //     comments: 4,
-  //     recommend: 1,
-  //   },
-  // ];
-  const [posts, setPosts] = useState([]);
-
   const allPosts = [...notices, ...posts];
 
+  // 서버에서 게시글 가져오기
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -70,6 +37,14 @@ const Board = () => {
 
     fetchPosts();
   }, []);
+
+  const createPost = () => {
+    if (!user) {
+      alert("로그인 후 이용해주세요");
+      return;
+    }
+    navigate("/board/posts");
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-6 text-sm bg-gray-50">
@@ -85,14 +60,14 @@ const Board = () => {
           <div className="col-span-1 text-center py-2">조회</div>
         </div>
 
-        {allPosts.map((post) => (
+        {allPosts.map((post, index) => (
           <div
             key={post.id}
             className={`grid grid-cols-12 items-center border-b hover:bg-gray-50 ${
               post.isNotice ? "bg-yellow-50 font-semibold" : ""
             }`}
           >
-            <div className="col-span-1 text-center py-2 text-gray-600">{post.isNotice ? "공지" : post.number}</div>
+            <div className="col-span-1 text-center py-2 text-gray-600">{post.isNotice ? "공지" : index + 1}</div>
             <div className="col-span-2 text-center py-2 text-blue-600">[{post.category}]</div>
             <div className="col-span-5 py-2 flex items-center gap-2 overflow-hidden">
               <span className="truncate">{post.title}</span>
@@ -118,15 +93,7 @@ const Board = () => {
 
         <button
           className="px-5 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-all hover:scale-105"
-          onClick={() => {
-            if (!isLogin) {
-              console.log("로그인췟:", isLogin);
-
-              alert("로그인 후 이용해주세요");
-              return;
-            }
-            navigate("/board/posts");
-          }}
+          onClick={createPost}
         >
           글쓰기
         </button>

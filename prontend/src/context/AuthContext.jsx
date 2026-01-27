@@ -27,7 +27,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post("http://localhost:3000/user/logout", {}, { withCredentials: true });
+      const response = await axios.post("http://localhost:3000/user/logout", {}, { withCredentials: true });
+      return response.data;
     } catch (error) {
       console.error("로그아웃 실패:", error);
     } finally {

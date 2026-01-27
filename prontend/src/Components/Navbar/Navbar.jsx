@@ -1,7 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import axios from "axios";
-import { useEffect } from "react";
 
 const Navbar = () => {
   const { isLogin, logout, user } = useAuth();
@@ -25,11 +23,11 @@ const Navbar = () => {
   const handleLogout = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post("http://localhost:3000/user/logout", {}, { withCredentials: true });
+      const response = await logout();
+      if (response) {
+        console.log("확인11111111");
 
-      if (response.data) {
-        logout();
-        alert(response.data.message || "로그아웃 되었습니다.");
+        alert(response.message || "로그아웃 되었습니다.");
         navigate("/");
       }
     } catch (error) {

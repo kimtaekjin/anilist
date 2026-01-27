@@ -5,18 +5,16 @@ import axios from "axios";
 
 export default function PostWritePage() {
   const navigate = useNavigate();
-  const { user, isLogin } = useAuth;
-
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  console.log(user);
 
   useEffect(() => {
-    if (!isLogin) {
+    if (!user) {
       alert("로그인 후 이용해주시길 바랍니다.");
       navigate("/");
     }
-  }, [isLogin, navigate]);
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,6 +40,7 @@ export default function PostWritePage() {
     const submit = await axios.post("http://localhost:3000/post", payload, {
       withCredentials: true,
     });
+    console.log(submit);
   };
 
   return (

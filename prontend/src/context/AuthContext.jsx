@@ -4,42 +4,52 @@ import axios from "axios";
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [isLogin, setIsLogin] = useState(false);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const checkAuth = async () => {
+    try {
+      const response = await axios.get("http://localhost:3000/user/verify-token", {
+        withCredentials: true,
+      });
+
+      setUser(response.data.user || null);
+    } catch (error) {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await axios.get("http://localhost:3000/user/verify-token", {
-          withCredentials: true,
-        });
-
-        if (response.data.user) {
-          setUser(response.data.user);
-          setIsLogin(true);
-          console.log("정보확인:", response.data.user);
-        }
-      } catch (error) {
-        setUser(null);
-        setIsLogin(false);
-      }
-    };
-
     checkAuth();
   }, []);
 
-  const login = (userData) => {
-    setUser(userData);
-    setIsLogin(true);
-  };
-
-  // 로그아웃 처리
   const logout = async () => {
-    setUser(null);
-    setIsLogin(false);
+    try {
+      await axios.post("http://localhost:3000/user/logout", {}, { withCredentials: true });
+    } catch (error) {
+      console.error("로그아웃 실패:", error);
+    } finally {
+      setUser(null);
+    }
   };
 
-  return <AuthContext.Provider value={{ isLogin, user, login, logout }}>{children}</AuthContext.Provider>;
+  const value = {
+    user,
+    isLogin: !!user,
+    loading,
+    checkAuth,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

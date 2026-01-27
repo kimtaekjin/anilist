@@ -11,6 +11,7 @@ import Airing from "./Page/MainPage/Airing";
 import Login from "./Page/Login/Login";
 import SingUp from "./Page/Login/SingUp";
 import Board from "./Page/BoardPage/BoardPage";
+import BoardCreatePost from "./Page/BoardPage/BoardCreatePost";
 
 function Layout() {
   return (
@@ -60,6 +61,10 @@ const route = createBrowserRouter([
       {
         path: "/board",
         element: <Board />,
+      },
+      {
+        path: "/board/posts",
+        element: <BoardCreatePost />,
       },
     ],
   },

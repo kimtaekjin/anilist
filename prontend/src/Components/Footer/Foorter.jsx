@@ -10,16 +10,16 @@ const Footer = () => {
 
           {/* 링크 */}
           <div className="flex space-x-6">
-            <a href="#" className="hover:text-white transition-colors duration-200">
+            <a href="/" className="hover:text-white transition-colors duration-200">
               Home
             </a>
-            <a href="#" className="hover:text-white transition-colors duration-200">
+            <a href="/" className="hover:text-white transition-colors duration-200">
               About
             </a>
-            <a href="#" className="hover:text-white transition-colors duration-200">
+            <a href="/" className="hover:text-white transition-colors duration-200">
               Contact
             </a>
-            <a href="#" className="hover:text-white transition-colors duration-200">
+            <a href="/" className="hover:text-white transition-colors duration-200">
               Privacy
             </a>
           </div>

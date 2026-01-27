@@ -1,7 +1,13 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const Board = () => {
+  const navigate = useNavigate();
+  const { user, isLogin } = useAuth;
+  console.log("유저정보:", user, " 로그인췍:", isLogin);
+
   const notices = [
     {
       id: "공지",
@@ -56,7 +62,6 @@ const Board = () => {
     const fetchPosts = async () => {
       try {
         const { data } = await axios.get("http://localhost:3000/post");
-        console.log(data);
         setPosts(data);
       } catch (err) {
         console.error(err);
@@ -111,7 +116,18 @@ const Board = () => {
           <button className="px-2 py-1 border hover:bg-gray-100 transition">▶</button>
         </div>
 
-        <button className="px-5 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-all hover:scale-105">
+        <button
+          className="px-5 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-all hover:scale-105"
+          onClick={() => {
+            if (!isLogin) {
+              console.log("로그인췟:", isLogin);
+
+              alert("로그인 후 이용해주세요");
+              return;
+            }
+            navigate("/board/posts");
+          }}
+        >
           글쓰기
         </button>
       </div>

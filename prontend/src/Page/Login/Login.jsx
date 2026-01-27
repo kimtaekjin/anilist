@@ -9,7 +9,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const { login } = useAuth();
+  const { checkAuth } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,11 +17,10 @@ const Login = () => {
       const response = await axios.post(
         "http://localhost:3000/user/login",
         { email, password },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       if (response.data) {
-        login(response.data.token);
-        localStorage.setItem("token", response.data.token);
+        checkAuth();
         alert(response.data.message || "로그인 되었습니다.");
         navigate("/");
       }

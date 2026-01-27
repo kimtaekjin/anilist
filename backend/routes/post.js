@@ -20,21 +20,21 @@ const verifyToken = (req, res, next) => {
 
 function formatPostDate(createdAt) {
   const postDate = new Date(createdAt);
+  // console.log(postDate);
+  // console.log(createdAt);
+
   const now = new Date();
 
-  // 오늘인지 확인
   const isToday =
     postDate.getFullYear() === now.getFullYear() &&
     postDate.getMonth() === now.getMonth() &&
     postDate.getDate() === now.getDate();
 
   if (isToday) {
-    // 오늘이면 시간 표시
     const hours = String(postDate.getHours()).padStart(2, "0");
     const minutes = String(postDate.getMinutes()).padStart(2, "0");
     return `${hours}:${minutes}`;
   } else {
-    // 오늘이 아니면 MM-DD 표시
     const month = String(postDate.getMonth() + 1).padStart(2, "0");
     const day = String(postDate.getDate()).padStart(2, "0");
     return `${month}-${day}`;
@@ -45,7 +45,6 @@ router.get("/", async (req, res) => {
   try {
     const posts = await Post.find().sort({ createdAt: -1 });
 
-    // createdAt을 포맷해서 새로운 필드 추가
     const formattedPosts = posts.map((post) => ({
       ...post.toObject(), // Mongoose 문서를 일반 JS 객체로 변환
       date: formatPostDate(post.createdAt), // 오늘/어제 기준 포맷

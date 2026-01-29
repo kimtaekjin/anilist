@@ -1,23 +1,23 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
     email: {
       type: String,
-      require: true,
+      required: true,
       trim: true,
     },
     username: {
       type: String,
-      require: true, //require = 필수값인지 체크하게 해줌
+      required: true, 
       trim: true,
       minlength: 2,
       maxlength: 30,
     },
     password: {
       type: String,
-      require: true,
-      select: false, //기본적으로 쿼리할 때 해당 필드를 포함하지 않음 ,보안: 비밀번호 같은 민감한 정보는 기본적으로 제외
+      required: true,
+      select: false, // 쿼리 시 기본적으로 제외, 보안
     },
     isLoggedIn: {
       type: Boolean,
@@ -38,18 +38,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    createAt: {
+    createdAt: {
       type: Date,
       default: Date.now,
     },
   },
   {
     timestamps: true,
-    //자동으로 createdAt과 updatedAt 필드를 추가
-    //문서가 생성되거나 수정될 때 시간 정보를 자동으로 기록
-  }
+  },
 );
 
 const User = mongoose.model("User", userSchema);
 
-module.exports = User;
+export default User;

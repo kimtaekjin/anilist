@@ -1,16 +1,19 @@
+// env 변수
 const GOOGLE_KEY = process.env.GOOGLETRANSLATION;
-const fetch = require("node-fetch");
-const wanakana = require("wanakana");
-const { wordReplacements, replacements } = require("./wordReplace");
+import "dotenv/config";
+
+// ESM용 import
+import fetch from "node-fetch";
+import wanakana from "wanakana";
+import { wordReplacements, replacements } from "./wordReplace.js";
 
 // ----------------------
 // Romaji → Katakana 변환 (숫자+영어 혼합 안전 처리)
 // ----------------------
-
-function romajiToKatakana(text) {
+export function romajiToKatakana(text) {
   if (!text) return "";
 
-  text = text.toLowerCase(text);
+  text = text.toLowerCase();
   console.log("원본::", text);
 
   for (const [pattern, repl] of replacements) {
@@ -31,7 +34,7 @@ function romajiToKatakana(text) {
 // ----------------------
 // Google Translate 호출
 // ----------------------
-async function translate(text, source, target) {
+export async function translate(text, source, target) {
   const bodyPayload = {
     q: text,
     target,
@@ -45,19 +48,14 @@ async function translate(text, source, target) {
   });
 
   const data = await response.json();
+
   return data.data?.translations?.[0]?.translatedText || text;
 }
 
 // ----------------------
 // Romaji 판단
 // ----------------------
-// function isRomaji(text) {
-//   const romajiPattern = /(sh|ch|ts|ky|ry|ny|hy|my|py|by|gy|j|ou|uu|aa|ii|ee|oo)/i;
-//   const onlyLatin = /^[a-zA-Z0-9\s\-:]+$/.test(text);
-//   return onlyLatin && romajiPattern.test(text);
-// }
-
-function isRomaji(text) {
+export function isRomaji(text) {
   if (!text) return false;
 
   // 알파벳 + 공백만
@@ -78,7 +76,10 @@ function isRomaji(text) {
   return true;
 }
 
-function replaceMistranslation(translatedText) {
+// ----------------------
+// 번역 수정
+// ----------------------
+export function replaceMistranslation(translatedText) {
   if (!translatedText) return "";
 
   let fixed = translatedText.trim();
@@ -90,5 +91,3 @@ function replaceMistranslation(translatedText) {
   }
   return fixed;
 }
-
-module.exports = { romajiToKatakana, translate, isRomaji, replaceMistranslation };

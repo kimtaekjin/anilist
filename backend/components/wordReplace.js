@@ -1,4 +1,5 @@
-const wordReplacements = [
+// 오번역 교정용 배열
+export const wordReplacements = [
   { from: "에치", to: "하렘" },
   { from: "고우메", to: "미식" },
   { from: "mys 테리", to: "미스테리" },
@@ -8,14 +9,11 @@ const wordReplacements = [
   { from: "신의 조화", to: "초자연" },
   { from: "마호우 쇼조", to: "마법소녀" },
   { from: "일상의 단면", to: "일상" },
-  //장르 분류
-
-  //캐릭터 이름
+  // 캐릭터 이름
   { from: "이k히고 쿠로사키", to: "쿠로사키 이치고" },
   { from: "우리 - 이시다", to: "우류 이시다" },
   { from: "쥬그라m 하sk후아l스", to: "주그램 하쉬발트" },
-
-  //애니 분류
+  // 애니 분류
   { from: "추시의 아이", to: "최애의 아이" },
   { from: "보치 · 자 · 롯쿠!", to: "봇치 더 락!" },
   { from: "장례식 프리렌", to: "장송의 프리렌" },
@@ -31,17 +29,15 @@ const wordReplacements = [
   { from: "표백제", to: "블리치" },
   { from: "소방팀", to: "불꽃 소방대" },
   { from: "내 영웅 아카데미아", to: "나의 히어로 아카데미아" },
-
   {
     from: "때때로 보소와 러시아어로 데레하는 옆의 아야씨",
     to: "가끔씩 툭하고 러시아어로 부끄러워하는 옆자리의 아랴 양",
   },
-
   { from: ["&#39;", ";", "&lt", "&gt", "&quot;"], to: "" },
 ];
 
-const replacements = [
-  // 이름/특수 단어
+// 로마자 변환 규칙
+export const replacements = [
   ["viktoriya", "vikutoriya"],
 
   // 복합 자음
@@ -108,4 +104,3 @@ const replacements = [
   ["ch", "ch"],
   ["sh", "sh"],
 ];
-module.exports = { wordReplacements, replacements };

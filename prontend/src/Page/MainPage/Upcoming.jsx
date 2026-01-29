@@ -44,8 +44,6 @@ const Upcoming = () => {
         const now = Date.now();
         const cachedUpcomming = JSON.parse(localStorage.getItem("upcommingAnime")) || { data: [], updated: 0 };
 
-        // console.log("확인", cachedUpcomming.data);
-
         if (cachedUpcomming.data.length && now - cachedUpcomming.updated < CACHE_DURATION) {
           setAnimeList(cachedUpcomming.data);
           return;

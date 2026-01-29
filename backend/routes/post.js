@@ -1,7 +1,8 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
-const Post = require("../models/Post");
-const jwt = require("jsonwebtoken");
+
+import jwt from "jsonwebtoken";
+import Post from "../models/Post.js";
 
 router.use(express.json());
 
@@ -18,11 +19,11 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+// ----------------------
+// 날짜 포맷 헬퍼
+// ----------------------
 function formatPostDate(createdAt) {
   const postDate = new Date(createdAt);
-  // console.log(postDate);
-  // console.log(createdAt);
-
   const now = new Date();
 
   const isToday =
@@ -41,13 +42,16 @@ function formatPostDate(createdAt) {
   }
 }
 
+// ----------------------
+// 전체 게시글 조회
+// ----------------------
 router.get("/", async (req, res) => {
   try {
     const posts = await Post.find().sort({ createdAt: -1 });
 
     const formattedPosts = posts.map((post) => ({
-      ...post.toObject(), // Mongoose 문서를 일반 JS 객체로 변환
-      date: formatPostDate(post.createdAt), // 오늘/어제 기준 포맷
+      ...post.toObject(),
+      date: formatPostDate(post.createdAt),
     }));
 
     res.json(formattedPosts);
@@ -57,6 +61,9 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ----------------------
+// 게시글 작성
+// ----------------------
 router.post("/", verifyToken, async (req, res) => {
   try {
     const { title, content, category } = req.body;
@@ -69,7 +76,7 @@ router.post("/", verifyToken, async (req, res) => {
       title,
       content,
       category: category || "자유",
-      author: req.body.id,
+      author: req.user.userId,
     });
 
     res.status(201).json(newPost);
@@ -79,4 +86,4 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

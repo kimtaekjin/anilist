@@ -1,13 +1,13 @@
-const express = require("express");
+import express from "express";
+import Translation from "../models/Translation.js";
+import { romajiToKatakana, translate, isRomaji, replaceMistranslation } from "../components/translateItem.js";
+
 const router = express.Router();
-const Translation = require("../models/Translation");
-const { romajiToKatakana, translate, isRomaji, replaceMistranslation } = require("../components/translateItem");
 
 router.use(express.json());
 
 // ----------------------
 // 번역 라우트
-
 // ----------------------
 router.post("/translate", async (req, res) => {
   const { text } = req.body;
@@ -22,7 +22,7 @@ router.post("/translate", async (req, res) => {
   let convertedText = originalText;
 
   try {
-    // DB 캐시 확인 (originalText + targetLang 기준)
+    // DB 캐시 확인
     const cached = await Translation.findOne({
       originalText,
       targetLang,
@@ -35,22 +35,22 @@ router.post("/translate", async (req, res) => {
       });
     }
 
-    // Romaji 감지 시 Katakana 변환
+    // Romaji → Katakana
     if (isRomaji(originalText)) {
       sourceLang = "ja";
       convertedText = romajiToKatakana(originalText);
       console.log(convertedText);
     }
 
-    // Google Translate 호출
+    // 번역
     let translatedText = await translate(convertedText, sourceLang, targetLang);
 
-    //오번역 된 단어 교체
+    // 오번역 교체
     translatedText = replaceMistranslation(translatedText);
 
-    // console.log("확인2:", originalText, " ", translatedText, " ", sourceLang);
+    // console.log("확인1:", translatedText, " :", convertedText);
 
-    // DB 저장 (originalText + targetLang 기준, convertedText도 기록)
+    // DB 저장
     await Translation.findOneAndUpdate(
       { originalText, targetLang },
       {
@@ -58,7 +58,7 @@ router.post("/translate", async (req, res) => {
         translatedText,
         sourceLang,
       },
-      { upsert: true, setDefaultsOnInsert: true }
+      { upsert: true, setDefaultsOnInsert: true },
     );
 
     res.json({ translatedText, cached: false });
@@ -68,4 +68,4 @@ router.post("/translate", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

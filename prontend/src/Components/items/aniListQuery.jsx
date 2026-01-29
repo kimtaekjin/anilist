@@ -39,7 +39,7 @@ export const fetchTrendingAnime = async () => {
           episodes: currentEpisode,
           type: anime.format,
         };
-      })
+      }),
   );
   return trending.slice(0, 30);
 };
@@ -78,7 +78,7 @@ export const fetchCompletedAnime = async () => {
       episodes: anime.episodes,
       status: anime.status,
       type: anime.format,
-    }))
+    })),
   );
 
   return completed;
@@ -116,7 +116,7 @@ export const fetchOVAAnime = async () => {
       image: anime.coverImage?.large,
       status: anime.status,
       type: anime.format,
-    }))
+    })),
   );
 
   return ovaList;
@@ -221,7 +221,7 @@ export const fetchAiringAnime = async () => {
         quarter: seasonToQuarter[anime.season],
         day: getDay(airingAt),
       };
-    })
+    }),
   );
 };
 
@@ -290,7 +290,7 @@ export const fetchGenreAnime = async (selectedSeason, selectedYear) => {
       genre: anime.genres ? await Promise.all(anime.genres.map((g) => translateText(g))) : [],
       startYear: anime.startDate?.year || "미정",
       studio: anime.studios.nodes[0]?.name || "미정",
-    }))
+    })),
   );
 
   return processed;
@@ -354,7 +354,7 @@ export const fetchUpcommingAnime = async () => {
         startDate,
         studio,
       };
-    })
+    }),
   );
 
   return data;
@@ -410,6 +410,7 @@ export const fetchDetailAnime = async (id) => {
             node {
               name {
                 full
+                native
               }
               image {
                 large
@@ -453,9 +454,9 @@ export const fetchDetailAnime = async (id) => {
       ? await Promise.all(
           data.characters.edges.map(async (edge) => ({
             role: edge.role,
-            name: edge.node.name.full ? await translateText(edge.node.name.full) : "이름 없음",
+            name: edge.node.name.native ? await translateText(edge.node.name.native) : edge.node.name.full,
             image: edge.node.image?.large,
-          }))
+          })),
         )
       : [],
     startdate: startDate,

@@ -1,38 +1,48 @@
-const express = require("express");
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+import service from "./routes/service.js";
+import user from "./routes/user.js";
+import post from "./routes/post.js";
+
+dotenv.config();
+
 const app = express();
 const PORT = 3000;
-const cors = require("cors");
-const mongoose = require("mongoose");
-const cookieParser = require("cookie-parser"); //req.cookies.token 할 시 쿠키를  jwt 전체가 아닌 문자열만 가져오게 한다.  cookie-parser 미들웨어
 
-require("dotenv").config();
-
-const service = require("./routes/service");
-const user = require("./routes/user");
-const post = require("./routes/post");
-
+// ----------------------
+// 미들웨어
+// ----------------------
 app.use(cookieParser());
 
 app.use(
   cors({
-    origin: "http://localhost:3001", //배포할 경우 배포한 도메인을 새로 넣어줘야 한다!
+    origin: "http://localhost:3001", // 배포 시 도메인 변경 필요
     credentials: true,
-  })
+  }),
 );
 
 app.use("/service", service);
 app.use("/user", user);
 app.use("/post", post);
 
+// ----------------------
+// MongoDB 연결
+// ----------------------
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log("MongoDB연결이 성공하였습니다");
+    console.log("MongoDB 연결 성공");
   })
   .catch((error) => {
-    console.log("MongoDB연결이 실패하였습니다", error);
+    console.log("MongoDB 연결 실패", error);
   });
 
+// ----------------------
+// 서버 시작
+// ----------------------
 app.listen(PORT, () => {
-  console.log("server is running:", PORT);
+  console.log("Server running on port:", PORT);
 });

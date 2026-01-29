@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const postSchema = new mongoose.Schema(
   {
@@ -26,10 +26,10 @@ const postSchema = new mongoose.Schema(
     ],
   },
   {
-    timestamps: true, // createdAt, updatedAt 자동 생성
-  }
+    timestamps: true,
+  },
 );
 
 const Post = mongoose.model("Post", postSchema);
 
-module.exports = Post;
+export default Post;

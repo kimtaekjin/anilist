@@ -86,4 +86,21 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: "게시글 ID가 필요합니다." });
+  }
+  try {
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: "게시글을 찾을 수 없습니다." });
+    }
+    res.json(post);
+  } catch (error) {
+    console.log(error);
+  }
+});
+
 export default router;

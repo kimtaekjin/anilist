@@ -12,6 +12,7 @@ import Login from "./Page/Login/Login";
 import SingUp from "./Page/Login/SingUp";
 import Board from "./Page/BoardPage/BoardPage";
 import BoardCreatePost from "./Page/BoardPage/BoardCreatePost";
+import PostDetailPage from "./Page/BoardPage/PostDetailPage";
 
 function Layout() {
   return (
@@ -65,6 +66,10 @@ const route = createBrowserRouter([
       {
         path: "/board/posts",
         element: <BoardCreatePost />,
+      },
+      {
+        path: "/board/posts/:id",
+        element: <PostDetailPage />,
       },
     ],
   },

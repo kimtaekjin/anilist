@@ -30,6 +30,7 @@ const Board = () => {
       try {
         const { data } = await axios.get("http://localhost:3000/post");
         setPosts(data);
+        console.log(data);
       } catch (err) {
         console.error(err);
       }
@@ -47,7 +48,7 @@ const Board = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 text-sm bg-gray-50">
+    <div className="max-w-6xl mx-auto  p-6 text-sm bg-gray-50">
       <h1 className="text-2xl font-bold mb-4 border-b border-gray-300 pb-2">자유 게시판</h1>
 
       <div className="border border-gray-300 bg-white shadow-sm">
@@ -62,10 +63,11 @@ const Board = () => {
 
         {allPosts.map((post, index) => (
           <div
-            key={post.id}
+            key={post._id}
             className={`grid grid-cols-12 items-center border-b hover:bg-gray-50 ${
               post.isNotice ? "bg-yellow-50 font-semibold" : ""
             }`}
+            onClick={() => navigate(`/board/posts/${post._id}`)}
           >
             <div className="col-span-1 text-center py-2 text-gray-600">{post.isNotice ? "공지" : index + 1}</div>
             <div className="col-span-2 text-center py-2 text-blue-600">[{post.category}]</div>

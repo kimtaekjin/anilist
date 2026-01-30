@@ -28,7 +28,6 @@ export default function PostWritePage() {
       alert("내용은 10자 이상 입력해주세요.");
       return;
     }
-    console.log("확인용:", user);
 
     const payload = {
       title,

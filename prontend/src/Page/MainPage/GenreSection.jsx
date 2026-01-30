@@ -2,33 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, Building } from "lucide-react";
 import Pagination from "../../Components/Pagination/Pagination";
-import { fetchGenreAnime } from "../../Components/items/aniListQuery";
-
-const AnimeCardSkeleton = () => (
-  <div className="bg-white rounded-2xl shadow-lg overflow-hidden animate-pulse">
-    {/* 이미지 자리 */}
-    <div className="h-52 w-full bg-gray-200 rounded-t-2xl" />
-
-    {/* 텍스트 자리 */}
-    <div className="p-4 space-y-2">
-      <div className="h-5 w-3/4 bg-gray-300 rounded" />
-      <div className="h-4 w-full bg-gray-200 rounded" />
-      <div className="h-4 w-5/6 bg-gray-200 rounded" />
-
-      {/* 장르 태그 자리 */}
-      <div className="flex flex-wrap gap-1 mt-2">
-        <div className="h-5 w-16 bg-gray-200 rounded-full" />
-        <div className="h-5 w-12 bg-gray-200 rounded-full" />
-      </div>
-
-      {/* 날짜 + 스튜디오 자리 */}
-      <div className="flex justify-between mt-2 text-sm text-gray-400">
-        <div className="h-4 w-12 bg-gray-200 rounded" />
-        <div className="h-4 w-16 bg-gray-200 rounded" />
-      </div>
-    </div>
-  </div>
-);
+import { fetchGenreAnime } from "../../Components/items/AniListQuery";
+import { GenreSkeleton } from "../../Components/items/Skeleton";
 
 const genresList = ["액션", "로맨스", "판타지", "SF", "일상", "스포츠", "모험"];
 
@@ -171,7 +146,7 @@ const GenreSection = () => {
       {isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <AnimeCardSkeleton key={i} />
+            <GenreSkeleton key={i} />
           ))}
         </div>
       )}

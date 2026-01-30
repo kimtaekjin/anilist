@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchUpcommingAnime } from "../../Components/items/aniListQuery";
+import { fetchUpcommingAnime } from "../../Components/items/AniListQuery";
+import { UpcommingSkeleton } from "../../Components/items/Skeleton";
 
 // const genreMapKR = {
 //   Action: "액션",
@@ -17,17 +18,6 @@ import { fetchUpcommingAnime } from "../../Components/items/aniListQuery";
 // };
 
 // Skeleton 카드
-const AnimeCardSkeleton = () => (
-  <div className="rounded-3xl bg-white shadow-xl overflow-hidden animate-pulse">
-    <div className="aspect-[16/9] bg-gray-200" />
-    <div className="p-6 space-y-2">
-      <div className="h-5 bg-gray-200 rounded w-3/4" />
-      <div className="h-4 bg-gray-200 rounded w-full" />
-      <div className="h-4 bg-gray-200 rounded w-5/6" />
-      <div className="h-3 bg-gray-200 rounded w-1/3 mt-2" />
-    </div>
-  </div>
-);
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
@@ -69,7 +59,7 @@ const Upcoming = () => {
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {Array.from({ length: 6 }).map((_, i) => (
-            <AnimeCardSkeleton key={i} />
+            <UpcommingSkeleton key={i} />
           ))}
         </div>
       )}

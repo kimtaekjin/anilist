@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAiringAnime } from "../../Components/items/aniListQuery";
-
-const AnimeCardSkeleton = () => (
-  <div className="rounded-2xl bg-white shadow-lg overflow-hidden animate-pulse">
-    <div className="h-48 bg-gray-200" />
-    <div className="p-4 space-y-2">
-      <div className="h-5 bg-gray-200 rounded w-3/4" />
-      <div className="h-4 bg-gray-200 rounded w-full" />
-    </div>
-  </div>
-);
+import { fetchAiringAnime } from "../../Components/items/AniListQuery";
+import { AiringSkeleton } from "../../Components/items/Skeleton";
 
 const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
 
@@ -75,7 +66,7 @@ const Airing = () => {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
         {isLoading
-          ? Array.from({ length: 8 }).map((_, i) => <AnimeCardSkeleton key={i} />)
+          ? Array.from({ length: 8 }).map((_, i) => <AiringSkeleton key={i} />)
           : filteredList.map((anime) => (
               <div
                 key={anime.id}

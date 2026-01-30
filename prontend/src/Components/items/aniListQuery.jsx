@@ -1,4 +1,4 @@
-import { translateText } from "./translate";
+import { translateText } from "./Translate";
 
 export const fetchTrendingAnime = async () => {
   const query = `

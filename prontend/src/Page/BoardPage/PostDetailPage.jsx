@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
 export default function PostDetailPage() {
-  const { id } = useParams(); // /post/:id
+  const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -12,21 +12,55 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState([]);
   const [comment, setComment] = useState("");
 
-  // 게시글 불러오기
+  function PostDetailSkeleton() {
+    return (
+      <div className="bg-white min-h-screen py-10 animate-pulse">
+        <div className="max-w-4xl mx-auto border border-gray-300">
+          {/* 헤더 */}
+          <div className="px-6 py-4 border-b border-gray-300 bg-gray-200">
+            <div className="h-6 w-2/3 bg-gray-300 rounded mb-2"></div>
+            <div className="h-4 w-1/3 bg-gray-300 rounded"></div>
+          </div>
+
+          {/* 본문 */}
+          <div className="p-6 min-h-[30rem] bg-gray-50 space-y-3">
+            <div className="h-4 bg-gray-300 rounded w-full"></div>
+            <div className="h-4 bg-gray-300 rounded w-11/12"></div>
+            <div className="h-4 bg-gray-300 rounded w-10/12"></div>
+            <div className="h-4 bg-gray-300 rounded w-9/12"></div>
+            <div className="h-4 bg-gray-300 rounded w-8/12"></div>
+          </div>
+
+          {/* 댓글 영역 */}
+          <div className="px-6 py-4 border-t border-gray-300 bg-white space-y-4">
+            <div className="h-4 w-24 bg-gray-300 rounded"></div>
+
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-3 w-full bg-gray-300 rounded"></div>
+                <div className="h-3 w-1/4 bg-gray-300 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     const fetchPost = async () => {
       const res = await axios.get(`http://localhost:3000/post/${id}`);
       setPost(res.data);
+      console.log(res.data);
     };
-    console.log("확인:", id);
 
-    // const fetchComments = async () => {
-    //   const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
-    //   setComments(res.data);
-    // };
+    const fetchComments = async () => {
+      const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
+      setComments(res.data);
+    };
 
     fetchPost();
-    // fetchComments();
+    fetchComments();
   }, [id]);
 
   // 댓글 등록
@@ -38,29 +72,22 @@ export default function PostDetailPage() {
       return;
     }
 
-    if (comment.trim().length < 2) {
-      alert("댓글은 2자 이상 입력해주세요.");
-      return;
-    }
-
     const payload = {
       content: comment,
-      userId: user.id,
-      postId: id,
+      userId: user.userId,
+      author: user.userName,
     };
 
-    await axios.post("http://localhost:3000/comment", payload, {
-      withCredentials: true,
-    });
+    await axios.post(`http://localhost:3000/post/${id}/comment`, payload, { withCredentials: true });
 
     setComment("");
+    alert("댓글이 작성되었습니다.");
 
-    // 댓글 다시 불러오기
     const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
     setComments(res.data);
   };
 
-  if (!post) return <div className="text-center py-20">로딩중...</div>;
+  if (!post) return <PostDetailSkeleton />;
 
   return (
     <div className="bg-white min-h-screen py-10">
@@ -69,7 +96,7 @@ export default function PostDetailPage() {
         <div className="px-6 py-4 border-b border-gray-300 bg-gray-200">
           <h2 className="text-xl font-bold">{post.title}</h2>
           <p className="text-sm text-gray-600 mt-1">
-            작성자: {post.user?.nickname || "익명"} · {post.createdAt}
+            작성자: {post.author} · {post.createdAt}
           </p>
         </div>
 
@@ -96,7 +123,7 @@ export default function PostDetailPage() {
               <div key={c.id} className="border-b pb-2">
                 <p className="text-sm">{c.content}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {c.user?.nickname || "익명"} · {c.createdAt}
+                  {c.author} · {c.createdAt}
                 </p>
               </div>
             ))}

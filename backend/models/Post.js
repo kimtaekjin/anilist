@@ -6,11 +6,13 @@ const postSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     content: { type: String, required: true },
     author: { type: String, required: true }, // 작성자
+    userId: { type: String, require: true },
     category: { type: String, default: "자유" }, // 말머리
     comments: [
       {
         author: String,
         content: String,
+        userId: String,
         createdAt: { type: Date, default: Date.now },
       },
     ], // 댓글
@@ -29,6 +31,8 @@ const postSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+postSchema.index({ number: -1 });
 
 const Post = mongoose.model("Post", postSchema);
 

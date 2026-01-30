@@ -28,19 +28,27 @@ export default function PostWritePage() {
       alert("내용은 10자 이상 입력해주세요.");
       return;
     }
+    console.log("확인용:", user);
 
     const payload = {
       title,
       content,
-      userId: user.id,
+      author: user.userName,
+      userId: user.userId,
     };
 
-    console.log(payload);
-
-    const submit = await axios.post("http://localhost:3000/post", payload, {
-      withCredentials: true,
-    });
-    console.log(submit);
+    try {
+      const submit = await axios.post("http://localhost:3000/post", payload, {
+        withCredentials: true,
+      });
+      if (submit) {
+        alert("게시글이 생성되었습니다.");
+        navigate("/board");
+      }
+    } catch (error) {
+      console.log(error);
+      alert("다시 시도해주십시오.");
+    }
   };
 
   return (

@@ -203,7 +203,6 @@ router.post("/:id/comment", verifyToken, async (req, res) => {
 //댓글 보기
 router.get("/:id/comments", async (req, res) => {
   const { id } = req.params;
-  console.log("연결");
 
   try {
     const post = await Post.findById(id);
@@ -215,6 +214,31 @@ router.get("/:id/comments", async (req, res) => {
     }));
 
     res.status(201).json(comments);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "서버 오류" });
+  }
+});
+
+//댓글 삭제
+router.delete("/:postId/comment/:commentId", verifyToken, async (req, res) => {
+  const { postId, commentId } = req.params;
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "게시글이 존재하지 않습니다." });
+
+    const comment = post.comments.id(commentId);
+    if (!comment) return res.status(404).json({ message: "댓글이 존재하지 않습니다." });
+
+    if (comment.userId !== req.user.userId) {
+      return res.status(403).json({ message: "삭제 권한이 없습니다." });
+    }
+
+    await comment.deleteOne();
+    await post.save();
+
+    res.status(200).json({ message: "댓글이 삭제되었습니다." });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "서버 오류" });

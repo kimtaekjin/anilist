@@ -22,6 +22,7 @@ export default function PostDetailPage() {
     const fetchComments = async () => {
       const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
       setComments(res.data);
+      console.log("코멘트확인:", res.data);
     };
 
     fetchPost();
@@ -57,6 +58,7 @@ export default function PostDetailPage() {
     }
   };
 
+  //게시판 삭제
   const handleDelete = async () => {
     const ok = window.confirm("정말 삭제하시겠습니까?");
     if (!ok) return;
@@ -74,32 +76,61 @@ export default function PostDetailPage() {
     }
   };
 
+  //댓글 삭제
+  const handleCommentDelete = async (commentId, commentUserId) => {
+    if (!user || user.userId !== commentUserId) {
+      alert("삭제 권한이 없습니다.");
+      return;
+    }
+
+    const ok = window.confirm("정말 삭제하시겠습니까?");
+    if (!ok) return;
+
+    try {
+      const res = await axios.delete(`http://localhost:3000/post/${id}/comment/${commentId}`, {
+        withCredentials: true,
+      });
+
+      if (res.status === 200) {
+        // 삭제 후 상태에서 댓글 제거
+        setComments((prev) => prev.filter((c) => c._id !== commentId));
+        alert("댓글이 삭제되었습니다.");
+      }
+    } catch (error) {
+      console.log(error);
+      alert("댓글 삭제 실패");
+    }
+  };
+
   if (!post) return <PostDetailSkeleton />;
 
   return (
     <div className="bg-white min-h-screen py-10">
       <div className="max-w-4xl mx-auto border border-gray-300">
         {/* 헤더 */}
-        <div className="flex justify-between  px-6 py-4 border-b border-gray-300 bg-gray-200">
+        <div className="flex justify-between px-6 py-4 border-b border-gray-300 bg-gray-200">
+          {/* 왼쪽 영역 */}
           <div className="max-w-2xl">
-            <h2 className="text-xl font-bold  truncate">{post.title}</h2>
+            <h2 className="text-xl font-bold truncate">{post.title}</h2>
             <p className="text-sm text-gray-600 mt-1">
               작성자: {post.author} · {post.createdAt}
             </p>
           </div>
-          <div className="flex ml-3 py-1 text-gray-600 text-sm space-x-2 ">
-            <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
-              수정
-            </button>
-            <button type="button" className="h-2 hover:text-gray-700" onClick={handleDelete}>
-              삭제
-            </button>
-          </div>
-        </div>
 
+          {/* 오른쪽 버튼 영역 (작성자만 보여줌) */}
+          {user && post.userId.toString() === user.userId && (
+            <div className="flex ml-3 py-1 text-gray-600 text-sm space-x-2">
+              <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
+                수정
+              </button>
+              <button type="button" className="h-2 hover:text-gray-700" onClick={handleDelete}>
+                삭제
+              </button>
+            </div>
+          )}
+        </div>
         {/* 본문 */}
         <div className="p-6 min-h-[30rem] bg-gray-50 whitespace-pre-wrap leading-relaxed text-sm">{post.content}</div>
-
         {/* 하단 버튼 */}
         <div className="flex justify-between px-6 py-4 border-t border-gray-200">
           <button
@@ -109,7 +140,6 @@ export default function PostDetailPage() {
             목록으로
           </button>
         </div>
-
         {/* 댓글 영역 */}
         <div className="px-6 py-4 border-t border-gray-300 bg-white">
           <h3 className="font-semibold mb-3">댓글 {comments.length}개</h3>
@@ -117,11 +147,22 @@ export default function PostDetailPage() {
           {/* 댓글 목록 */}
           <div className="space-y-3 mb-6">
             {comments.map((c) => (
-              <div key={c.id} className="border-b pb-2">
-                <p className="text-sm">{c.content}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {c.author} · {c.createdAt}
-                </p>
+              <div key={c.id} className="border-b pb-2 flex justify-between items-start">
+                <div>
+                  <p className="text-sm">{c.content}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {c.author} · {c.createdAt}
+                  </p>
+                </div>
+
+                {user && c.userId === user.userId && (
+                  <button
+                    onClick={() => handleCommentDelete(c._id, c.userId)}
+                    className="text-xs text-red-500 hover:text-red-700 ml-2"
+                  >
+                    삭제
+                  </button>
+                )}
               </div>
             ))}
 

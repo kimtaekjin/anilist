@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
@@ -9,12 +9,25 @@ export default function PostWritePage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
+  const { id } = useParams();
+  const isEdit = Boolean(id);
+
   useEffect(() => {
     if (!user) {
       alert("로그인 후 이용해주시길 바랍니다.");
       navigate("/");
     }
   }, [user, navigate]);
+
+  //수정모드
+  useEffect(() => {
+    if (isEdit) {
+      axios.get(`http://localhost:3000/post/${id}`).then((res) => {
+        setTitle(res.data.title);
+        setContent(res.data.content);
+      });
+    }
+  }, [isEdit, id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,8 +37,13 @@ export default function PostWritePage() {
       return;
     }
 
+    if (title.trim().length > 30) {
+      alert("제목은 최대 30자까지 입력해주세요.");
+      return;
+    }
+
     if (content.trim().length < 10) {
-      alert("내용은 10자 이상 입력해주세요.");
+      alert("내용은 5자 이상 입력해주세요.");
       return;
     }
 
@@ -37,11 +55,16 @@ export default function PostWritePage() {
     };
 
     try {
-      const submit = await axios.post("http://localhost:3000/post", payload, {
-        withCredentials: true,
-      });
-      if (submit) {
-        alert("게시글이 생성되었습니다.");
+      const res = isEdit
+        ? await axios.put(`http://localhost:3000/post/${id}`, payload, {
+            withCredentials: true,
+          })
+        : await axios.post("http://localhost:3000/post", payload, {
+            withCredentials: true,
+          });
+
+      if (res) {
+        alert(isEdit ? "게시글이 수정되었습니다." : "게시글이 생성되었습니다.");
         navigate("/board");
       }
     } catch (error) {
@@ -76,7 +99,7 @@ export default function PostWritePage() {
                 focus:outline-none focus:border-blue-600
               "
             />
-            <p className="mt-1 text-xs text-gray-500">제목은 최대 100자까지 입력 가능합니다.</p>
+            <p className="mt-1 text-xs text-gray-500">제목은 최대 30자까지 입력 가능합니다.</p>
           </div>
 
           {/* 내용 */}

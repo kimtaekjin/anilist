@@ -30,7 +30,7 @@ const Board = () => {
       try {
         const { data } = await axios.get("http://localhost:3000/post");
         setPosts(data);
-        console.log(data);
+        // console.log(data);
       } catch (err) {
         console.error(err);
       }
@@ -64,7 +64,7 @@ const Board = () => {
         {allPosts.map((post, index) => (
           <div
             key={post._id}
-            className={`grid grid-cols-12 items-center border-b hover:bg-gray-50 ${
+            className={`grid grid-cols-12 items-center cursor-pointer border-b hover:bg-gray-50 ${
               post.isNotice ? "bg-yellow-50 font-semibold" : ""
             }`}
             onClick={() => navigate(`/board/posts/${post._id}`)}

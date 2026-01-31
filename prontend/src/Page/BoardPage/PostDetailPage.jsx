@@ -17,7 +17,6 @@ export default function PostDetailPage() {
     const fetchPost = async () => {
       const res = await axios.get(`http://localhost:3000/post/${id}`);
       setPost(res.data);
-      console.log(res.data);
     };
 
     const fetchComments = async () => {
@@ -58,17 +57,44 @@ export default function PostDetailPage() {
     }
   };
 
+  const handleDelete = async () => {
+    const ok = window.confirm("정말 삭제하시겠습니까?");
+    if (!ok) return;
+    try {
+      const res = await axios.delete(`http://localhost:3000/post/${id}`, {
+        withCredentials: true,
+      });
+
+      if (res.status === 200) {
+        alert("게시글이 삭제되었습니다.");
+        navigate("/board");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   if (!post) return <PostDetailSkeleton />;
 
   return (
     <div className="bg-white min-h-screen py-10">
       <div className="max-w-4xl mx-auto border border-gray-300">
         {/* 헤더 */}
-        <div className="px-6 py-4 border-b border-gray-300 bg-gray-200">
-          <h2 className="text-xl font-bold">{post.title}</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            작성자: {post.author} · {post.createdAt}
-          </p>
+        <div className="flex justify-between  px-6 py-4 border-b border-gray-300 bg-gray-200">
+          <div className="max-w-2xl">
+            <h2 className="text-xl font-bold  truncate">{post.title}</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              작성자: {post.author} · {post.createdAt}
+            </p>
+          </div>
+          <div className="flex ml-3 py-1 text-gray-600 text-sm space-x-2 ">
+            <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
+              수정
+            </button>
+            <button type="button" className="h-2 hover:text-gray-700" onClick={handleDelete}>
+              삭제
+            </button>
+          </div>
         </div>
 
         {/* 본문 */}

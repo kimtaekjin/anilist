@@ -68,6 +68,10 @@ const route = createBrowserRouter([
         element: <BoardCreatePost />,
       },
       {
+        path: "/board/edit/:id",
+        element: <BoardCreatePost />, //수정모드
+      },
+      {
         path: "/board/posts/:id",
         element: <PostDetailPage />,
       },

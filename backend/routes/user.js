@@ -7,7 +7,6 @@ import User from "../models/User.js"; // mongoose 모델
 
 router.use(express.json());
 
-// ----------------------
 // 회원가입
 // ----------------------
 router.post("/signup", async (req, res) => {
@@ -41,7 +40,6 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// ----------------------
 // 로그인
 // ----------------------
 router.post("/login", async (req, res) => {
@@ -87,7 +85,6 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// ----------------------
 // 로그아웃
 // ----------------------
 router.post("/logout", async (req, res) => {
@@ -123,7 +120,6 @@ router.post("/logout", async (req, res) => {
   }
 });
 
-// ----------------------
 // 토큰 검증
 // ----------------------
 router.get("/verify-token", (req, res) => {

@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema(
     },
     username: {
       type: String,
-      required: true, 
+      required: true,
       trim: true,
       minlength: 2,
       maxlength: 30,
@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       select: false, // 쿼리 시 기본적으로 제외, 보안
+    },
+    admin: {
+      type: Boolean,
+      default: false,
     },
     isLoggedIn: {
       type: Boolean,

@@ -64,9 +64,13 @@ router.post("/login", async (req, res) => {
     user.isLoggedIn = true;
     await user.save();
 
-    const token = jwt.sign({ userId: user._id, email: user.email, userName: user.username }, process.env.JWT_SECRET, {
-      expiresIn: "24h",
-    });
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, userName: user.username, admin: user.admin },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "24h",
+      },
+    );
 
     res.cookie("token", token, {
       httpOnly: true,

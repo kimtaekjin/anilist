@@ -8,21 +8,19 @@ const Board = () => {
   const { user } = useAuth();
   const [posts, setPosts] = useState([]);
 
-  const notices = [
-    {
-      id: "공지",
-      category: "공지",
-      title: "인벤 게시판 이용 규칙 안내",
-      author: "INVEN",
-      date: "01-10",
-      views: 9999,
-      comments: 32,
-      recommend: 12,
-      isNotice: true,
-    },
-  ];
-
-  const allPosts = [...notices, ...posts];
+  // const notices = [
+  //   {
+  //     id: "공지",
+  //     category: "공지",
+  //     title: " 게시판 이용 규칙 안내",
+  //     author: "운영자",
+  //     date: "01-10",
+  //     views: 9999,
+  //     comments: 32,
+  //     recommend: 12,
+  //     isNotice: true,
+  //   },
+  // ];
 
   // 서버에서 게시글 가져오기
   useEffect(() => {
@@ -30,7 +28,6 @@ const Board = () => {
       try {
         const { data } = await axios.get("http://localhost:3000/post");
         setPosts(data);
-        // console.log(data);
       } catch (err) {
         console.error(err);
       }
@@ -61,7 +58,7 @@ const Board = () => {
           <div className="col-span-1 text-center py-2">조회</div>
         </div>
 
-        {allPosts.map((post, index) => (
+        {posts.map((post, index) => (
           <div
             key={post._id}
             className={`grid grid-cols-12 items-center cursor-pointer border-b hover:bg-gray-50 ${
@@ -73,7 +70,7 @@ const Board = () => {
             <div className="col-span-2 text-center py-2 text-blue-600">[{post.category}]</div>
             <div className="col-span-5 py-2 flex items-center gap-2 overflow-hidden">
               <span className="truncate">{post.title}</span>
-              {post.comments > 0 && <span className="text-orange-500">[{post.comments}]</span>}
+              {post.comments.length > 0 && <span className="text-orange-500">[{post.comments.length}]</span>}
               {post.recommend >= 5 && (
                 <span className="text-red-500 text-xs border border-red-400 px-1 rounded">추천</span>
               )}

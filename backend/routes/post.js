@@ -21,6 +21,24 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+const optionalVerifyToken = (req, res, next) => {
+  const token = req.cookies.token;
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+  } catch (error) {
+    req.user = null;
+  }
+
+  next();
+};
+
 // ----------------------
 // 날짜 포맷 헬퍼
 // ----------------------
@@ -49,7 +67,7 @@ function formatPostDate(createdAt) {
 // ----------------------
 router.get("/", async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const posts = await Post.find().sort({ isNotice: -1, number: 1 });
 
     const formattedPosts = posts.map((post) => ({
       ...post.toObject(),
@@ -133,16 +151,26 @@ router.put("/:id", verifyToken, async (req, res) => {
 });
 
 //게시글 상세보기
-router.get("/:id", async (req, res) => {
+router.get("/:id", optionalVerifyToken, async (req, res) => {
   const { id } = req.params;
 
   try {
     const post = await Post.findById(id);
-
     if (!post) {
       return res.status(404).json({ message: "게시글을 찾을 수 없습니다." });
     }
 
+    if (req.user) {
+      const alreadyViewed = post.viewLogs.some((log) => log.userId === req.user.id);
+
+      if (!alreadyViewed) {
+        post.views += 1;
+        post.viewLogs.push({
+          userId: req.user.id,
+        });
+        await post.save();
+      }
+    }
     const formattedPost = {
       ...post.toObject(),
       createdAt: dayjs(post.createdAt).format("YYYY-MM-DD HH:mm:ss"),
@@ -154,12 +182,9 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ message: "서버 오류" });
   }
 });
-
 //게시글 삭제
 router.delete("/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
-
-  console.log("확인:", req.user);
 
   try {
     const post = await Post.findById(id);
@@ -231,7 +256,7 @@ router.delete("/:postId/comment/:commentId", verifyToken, async (req, res) => {
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "댓글이 존재하지 않습니다." });
 
-    if (comment.userId !== req.user.userId) {
+    if (comment.userId !== req.user.userId && !req.user.isAdmin) {
       return res.status(403).json({ message: "삭제 권한이 없습니다." });
     }
 

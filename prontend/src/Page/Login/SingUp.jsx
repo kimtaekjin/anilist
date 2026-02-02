@@ -12,15 +12,13 @@ const SignUp = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("확인용");
     try {
       if (password !== passwordConfirm) {
         alert("비밀번호가 일치하지 않습니다.");
         return;
       }
-
-      const response = await axios.post("http://localhost:3000/user/singup", { username: nickname, email, password });
-      console.log(response);
+      const response = await axios.post("http://localhost:3000/user/signup", { username: nickname, email, password });
+      console.log("응", response);
 
       if (response.status === 201) {
         alert(response.data.message);

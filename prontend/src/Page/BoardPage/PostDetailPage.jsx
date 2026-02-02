@@ -12,17 +12,19 @@ export default function PostDetailPage() {
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [comment, setComment] = useState("");
+  const isAdmin = user?.admin === true;
 
   useEffect(() => {
     const fetchPost = async () => {
-      const res = await axios.get(`http://localhost:3000/post/${id}`);
+      const res = await axios.get(`http://localhost:3000/post/${id}`, {
+        withCredentials: true,
+      });
       setPost(res.data);
     };
 
     const fetchComments = async () => {
       const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
       setComments(res.data);
-      console.log("코멘트확인:", res.data);
     };
 
     fetchPost();
@@ -78,7 +80,7 @@ export default function PostDetailPage() {
 
   //댓글 삭제
   const handleCommentDelete = async (commentId, commentUserId) => {
-    if (!user || user.userId !== commentUserId) {
+    if (!user || (user.userId !== commentUserId && !isAdmin)) {
       alert("삭제 권한이 없습니다.");
       return;
     }
@@ -118,7 +120,7 @@ export default function PostDetailPage() {
           </div>
 
           {/* 오른쪽 버튼 영역 (작성자만 보여줌) */}
-          {user && post.userId.toString() === user.userId && (
+          {user && (post.userId.toString() === user.userId || isAdmin) && (
             <div className="flex ml-3 py-1 text-gray-600 text-sm space-x-2">
               <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
                 수정
@@ -147,7 +149,7 @@ export default function PostDetailPage() {
           {/* 댓글 목록 */}
           <div className="space-y-3 mb-6">
             {comments.map((c) => (
-              <div key={c.id} className="border-b pb-2 flex justify-between items-start">
+              <div key={c._id} className="border-b pb-2 flex justify-between items-start">
                 <div>
                   <p className="text-sm">{c.content}</p>
                   <p className="text-xs text-gray-500 mt-1">
@@ -155,7 +157,7 @@ export default function PostDetailPage() {
                   </p>
                 </div>
 
-                {user && c.userId === user.userId && (
+                {((user && c.userId === user.userId) || isAdmin) && (
                   <button
                     onClick={() => handleCommentDelete(c._id, c.userId)}
                     className="text-xs text-red-500 hover:text-red-700 ml-2"

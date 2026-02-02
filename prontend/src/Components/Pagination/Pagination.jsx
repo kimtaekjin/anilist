@@ -3,7 +3,7 @@ import React from "react";
 const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 5, onPageChange }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
-  if (totalPages <= 1) return null; // 페이지가 1이면 렌더링 안 함
+  if (totalPages <= 1) return null;
 
   const getPageNumbers = () => {
     const pages = [];

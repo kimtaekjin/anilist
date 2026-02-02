@@ -40,8 +40,6 @@ const GenreSection = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  /* ---------- 데이터 로드 ---------- */
-
   useEffect(() => {
     const fetchAnime = async () => {
       setIsLoading(true);
@@ -96,9 +94,6 @@ const GenreSection = () => {
     setSelectedGenres((prev) => (prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]));
   };
 
-  /* =======================
-     Render
-  ======================= */
   return (
     <div className="container mx-auto px-4 py-20">
       <h1 className="text-3xl font-bold mb-6">장르 · 분기별 작품</h1>

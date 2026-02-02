@@ -1,4 +1,3 @@
-// 기존 import 그대로 사용
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +13,6 @@ const Board = () => {
 
   const itemsPerPage = 15;
 
-  // 서버에서 게시글 가져오기
   useEffect(() => {
     const fetchPosts = async () => {
       setCurrentPage(1);
@@ -36,25 +34,22 @@ const Board = () => {
     navigate("/board/posts");
   };
 
-  // ============================
-  // 페이지네이션 처리
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
   const currentPosts = posts.slice(indexOfFirst, indexOfLast);
-  // ============================
 
   return (
-    <div className="max-w-6xl mx-auto p-6 text-sm bg-gray-50">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 text-sm bg-gray-50">
       <h1 className="text-2xl font-bold mb-4 border-b border-gray-300 pb-2">자유 게시판</h1>
 
       <div className="border border-gray-300 bg-white shadow-sm">
-        <div className="grid grid-cols-12 bg-gray-100 font-semibold text-gray-700 border-b">
+        <div className="grid grid-cols-12 bg-gray-100 font-semibold text-gray-700 border-b text-xs sm:text-sm">
           <div className="col-span-1 text-center py-2">번호</div>
-          <div className="col-span-2 text-center py-2">말머리</div>
+          <div className="col-span-2 text-center py-2 hidden sm:block">말머리</div>
           <div className="col-span-5 py-2">제목</div>
-          <div className="col-span-2 text-center py-2">작성자</div>
-          <div className="col-span-1 text-center py-2">날짜</div>
-          <div className="col-span-1 text-center py-2">조회</div>
+          <div className="col-span-2 text-center py-2 hidden sm:block">작성자</div>
+          <div className="col-span-1 text-center py-2 hidden md:block">날짜</div>
+          <div className="col-span-1 text-center py-2 hidden lg:block">조회</div>
         </div>
 
         {currentPosts.map((post, index) => {
@@ -69,7 +64,7 @@ const Board = () => {
               onClick={() => navigate(`/board/posts/${post._id}`)}
             >
               <div className="col-span-1 text-center py-2 text-gray-600">{displayNumber}</div>
-              <div className="col-span-2 text-center py-2 text-blue-600">[{post.category}]</div>
+              <div className="col-span-2 text-center py-2 text-blue-600 hidden sm:block">[{post.category}]</div>
               <div className="col-span-5 py-2 flex items-center gap-2 overflow-hidden">
                 <span className="truncate">{post.title}</span>
                 {post.comments.length > 0 && <span className="text-orange-500">[{post.comments.length}]</span>}
@@ -77,15 +72,15 @@ const Board = () => {
                   <span className="text-red-500 text-xs border border-red-400 px-1 rounded">추천</span>
                 )}
               </div>
-              <div className="col-span-2 text-center py-2 text-gray-700">{post.author}</div>
-              <div className="col-span-1 text-center py-2 text-gray-500">{post.date}</div>
-              <div className="col-span-1 text-center py-2 text-gray-500">{post.views}</div>
+              <div className="col-span-2 text-center py-2 text-gray-700 hidden sm:block">{post.author}</div>
+              <div className="col-span-1 text-center py-2 text-gray-500 hidden md:block">{post.date}</div>
+              <div className="col-span-1 text-center py-2 text-gray-500 hidden lg:block">{post.views}</div>
             </div>
           );
         })}
       </div>
 
-      <div className="flex justify-between items-center mt-6">
+      <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
         <Pagination
           currentPage={currentPage}
           totalItems={posts.length}

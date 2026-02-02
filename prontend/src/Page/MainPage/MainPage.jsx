@@ -13,12 +13,11 @@ const MainPage = () => {
     const fetchAnime = async () => {
       try {
         const now = Date.now();
-        // 1️⃣ localStorage에서 저장된 데이터 읽기
+
         const cachedTrending = JSON.parse(localStorage.getItem("trendingAnime")) || { data: [], updated: 0 };
         const cachedCompleted = JSON.parse(localStorage.getItem("completedAnime")) || { data: [], updated: 0 };
         const cachedOVA = JSON.parse(localStorage.getItem("ovaAnime")) || { data: [], updated: 0 };
 
-        // 2️⃣ 캐시가 있으면 바로 보여주기
         if (
           cachedTrending.data.length &&
           cachedCompleted.data.length &&

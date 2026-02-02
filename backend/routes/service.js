@@ -26,6 +26,7 @@ router.post("/translate", async (req, res) => {
     const cached = await Translation.findOne({
       originalText,
       targetLang,
+      sourceLang,
     });
 
     if (cached?.translatedText?.trim()) {
@@ -52,13 +53,17 @@ router.post("/translate", async (req, res) => {
 
     // DB 저장
     await Translation.findOneAndUpdate(
-      { originalText, targetLang },
+      { originalText, targetLang, sourceLang },
       {
-        convertedText,
-        translatedText,
-        sourceLang,
+        $setOnInsert: {
+          translatedText,
+          createdAt: new Date(),
+        },
       },
-      { upsert: true, setDefaultsOnInsert: true },
+      {
+        upsert: true,
+        new: true,
+      },
     );
 
     res.json({ translatedText, cached: false });

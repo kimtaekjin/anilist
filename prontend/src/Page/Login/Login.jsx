@@ -9,7 +9,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const API = process.env.NEXT_PUBLIC_API_URL;
+  const API = process.env.REACT_APP_CLIENT_URL;
 
   const { checkAuth } = useAuth();
 

@@ -5,7 +5,7 @@ import axios from "axios";
 
 export default function PostWritePage() {
   const navigate = useNavigate();
-  const API = process.env.NEXT_PUBLIC_API_URL;
+  const API = process.env.REACT_APP_CLIENT_URL;
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");

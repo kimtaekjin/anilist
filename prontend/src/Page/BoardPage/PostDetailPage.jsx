@@ -6,7 +6,7 @@ import { PostDetailSkeleton } from "../../Components/items/Skeleton";
 
 export default function PostDetailPage() {
   const { id } = useParams();
-  const API = process.env.NEXT_PUBLIC_API_URL;
+  const API = process.env.REACT_APP_CLIENT_URL;
   const navigate = useNavigate();
   const { user } = useAuth();
 

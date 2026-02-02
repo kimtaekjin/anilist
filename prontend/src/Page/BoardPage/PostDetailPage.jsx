@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
-import { PostDetailSkeleton } from "../../components/items/Skeleton";
+import { PostDetailSkeleton } from "../../Components/items/Skeleton";
 
 export default function PostDetailPage() {
   const { id } = useParams();

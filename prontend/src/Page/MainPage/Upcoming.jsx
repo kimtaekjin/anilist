@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchUpcommingAnime } from "../../components/items/AniListQuery.jsx";
-import { UpcommingSkeleton } from "../../components/items/Skeleton";
+import { fetchUpcommingAnime } from "../../Components/items/AniListQuery.jsx";
+import { UpcommingSkeleton } from "../../Components/items/Skeleton";
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 

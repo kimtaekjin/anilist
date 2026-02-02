@@ -1,4 +1,4 @@
-import { translateText } from "./Translate";
+import { TranslateText } from "./Translate.jsx";
 
 export const fetchTrendingAnime = async () => {
   const query = `
@@ -23,7 +23,6 @@ export const fetchTrendingAnime = async () => {
     body: JSON.stringify({ query }),
   });
   const json = await res.json();
-  console.log(json);
 
   const trending = await Promise.all(
     json.data.Page.media

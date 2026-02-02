@@ -17,9 +17,10 @@ const PORT = 3000;
 // ----------------------
 app.use(cookieParser());
 
+const isProd = process.env.NODE_ENV === "production";
 app.use(
   cors({
-    origin: "http://localhost:3001", // 배포 시 도메인 변경 필요
+    origin: isProd ? process.env.CLIENT_URL : process.env.SERVER_URL, // 배포 시 도메인 변경 필요
     credentials: true,
   }),
 );

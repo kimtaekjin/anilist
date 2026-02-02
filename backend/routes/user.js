@@ -71,11 +71,12 @@ router.post("/login", async (req, res) => {
         expiresIn: "24h",
       },
     );
+    const isProd = process.env.NODE_ENV === "production";
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false, // 배포 시 true로 변경
-      sameSite: "strict",
+      secure: isProd,
+      sameSite: isProd ? "none" : "strict",
       maxAge: 24 * 60 * 60 * 1000, // 24시간
     });
 
@@ -141,4 +142,4 @@ router.get("/verify-token", (req, res) => {
   }
 });
 
-export default router; // ESM
+export default router;

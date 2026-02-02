@@ -1,23 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchUpcommingAnime } from "../../Components/items/AniListQuery";
+import { fetchUpcommingAnime } from "../../Components/items/AniListQuery.jsx";
 import { UpcommingSkeleton } from "../../Components/items/Skeleton";
-
-// const genreMapKR = {
-//   Action: "액션",
-//   Romance: "로맨스",
-//   Fantasy: "판타지",
-//   "Slice of Life": "일상",
-//   Sports: "스포츠",
-//   SciFi: "SF",
-//   Adventure: "모험",
-//   Comedy: "코미디",
-//   Horror: "공포",
-//   Mystery: "미스터리",
-// };
-
-// Skeleton 카드
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 

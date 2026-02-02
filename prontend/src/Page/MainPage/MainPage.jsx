@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchTrendingAnime, fetchCompletedAnime, fetchOVAAnime } from "../../Components/items/AniListQuery";
+import { fetchTrendingAnime, fetchCompletedAnime, fetchOVAAnime } from "../../Components/items/AniListQuery.jsx";
 import MainPageCard from "./MainPageCard";
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000;

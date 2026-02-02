@@ -5,6 +5,7 @@ import axios from "axios";
 
 export default function PostWritePage() {
   const navigate = useNavigate();
+  const API = process.env.NEXT_PUBLIC_API_URL;
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -22,7 +23,7 @@ export default function PostWritePage() {
   //수정모드
   useEffect(() => {
     if (isEdit) {
-      axios.get(`http://localhost:3000/post/${id}`).then((res) => {
+      axios.get(`${API}/post/${id}`).then((res) => {
         setTitle(res.data.title);
         setContent(res.data.content);
       });
@@ -56,10 +57,10 @@ export default function PostWritePage() {
 
     try {
       const res = isEdit
-        ? await axios.put(`http://localhost:3000/post/${id}`, payload, {
+        ? await axios.put(`${API}/post/${id}`, payload, {
             withCredentials: true,
           })
-        : await axios.post("http://localhost:3000/post", payload, {
+        : await axios.post(`${API}/post`, payload, {
             withCredentials: true,
           });
 

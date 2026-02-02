@@ -6,6 +6,7 @@ import { PostDetailSkeleton } from "../../Components/items/Skeleton";
 
 export default function PostDetailPage() {
   const { id } = useParams();
+  const API = process.env.NEXT_PUBLIC_API_URL;
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -16,14 +17,14 @@ export default function PostDetailPage() {
 
   useEffect(() => {
     const fetchPost = async () => {
-      const res = await axios.get(`http://localhost:3000/post/${id}`, {
+      const res = await axios.get(`${API}/post/${id}`, {
         withCredentials: true,
       });
       setPost(res.data);
     };
 
     const fetchComments = async () => {
-      const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
+      const res = await axios.get(`${API}/post/${id}/comments`);
       setComments(res.data);
     };
 
@@ -46,13 +47,13 @@ export default function PostDetailPage() {
         author: user.userName,
       };
 
-      const response = await axios.post(`http://localhost:3000/post/${id}/comment`, payload, { withCredentials: true });
+      const response = await axios.post(`${API}/post/${id}/comment`, payload, { withCredentials: true });
 
       if (response) {
         setComment("");
         alert("댓글이 작성되었습니다.");
 
-        const res = await axios.get(`http://localhost:3000/post/${id}/comments`);
+        const res = await axios.get(`${API}/post/${id}/comments`);
         setComments(res.data);
       }
     } catch (error) {
@@ -69,7 +70,7 @@ export default function PostDetailPage() {
     const ok = window.confirm("정말 삭제하시겠습니까?");
     if (!ok) return;
     try {
-      const res = await axios.delete(`http://localhost:3000/post/${id}`, {
+      const res = await axios.delete(`${API}/post/${id}`, {
         withCredentials: true,
       });
 
@@ -97,7 +98,7 @@ export default function PostDetailPage() {
     if (!ok) return;
 
     try {
-      const res = await axios.delete(`http://localhost:3000/post/${id}/comment/${commentId}`, {
+      const res = await axios.delete(`${API}/post/${id}/comment/${commentId}`, {
         withCredentials: true,
       });
 

@@ -6,6 +6,7 @@ import Pagination from "../../Components/Pagination/Pagination";
 
 const Board = () => {
   const navigate = useNavigate();
+  const API = process.env.NEXT_PUBLIC_API_URL;
   const { user } = useAuth();
 
   const [posts, setPosts] = useState([]);
@@ -17,7 +18,7 @@ const Board = () => {
     const fetchPosts = async () => {
       setCurrentPage(1);
       try {
-        const { data } = await axios.get("http://localhost:3000/post");
+        const { data } = await axios.get(`${API}/post`);
         setPosts(data);
       } catch (err) {
         console.error(err);

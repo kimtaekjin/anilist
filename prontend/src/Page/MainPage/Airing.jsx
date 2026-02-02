@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAiringAnime } from "../../Components/items/AniListQuery.jsx";
-import { AiringSkeleton } from "../../Components/items/Skeleton";
+import { fetchAiringAnime } from "../../components/items/AniListQuery.jsx";
+import { AiringSkeleton } from "../../components/items/Skeleton";
 
 const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
 
@@ -20,8 +20,6 @@ const Airing = () => {
         const now = Date.now();
 
         const cachedAiring = JSON.parse(localStorage.getItem("animeList")) || { data: [], updated: 0 };
-
-        // console.log(cachedAiring.data);
 
         if (cachedAiring.data.length && now - cachedAiring.updated < CACHE_DURATION) {
           setAnimeList(cachedAiring.data);

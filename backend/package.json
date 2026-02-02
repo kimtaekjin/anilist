@@ -13,7 +13,8 @@
     "node-fetch": "^2.7.0",
     "nodemon": "^3.1.11",
     "p-limit": "^7.2.0",
-    "wanakana": "^5.3.1"
+    "wanakana": "^5.3.1",
+    "anilist": "github:qlcdmlrlf/anilist#main"
   },
   "name": "backend",
   "version": "1.0.0",

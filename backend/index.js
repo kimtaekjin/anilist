@@ -12,9 +12,6 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// ----------------------
-// 미들웨어
-// ----------------------
 app.use(cookieParser());
 
 const isProd = process.env.NODE_ENV === "production";
@@ -29,21 +26,15 @@ app.use("/service", service);
 app.use("/user", user);
 app.use("/post", post);
 
-// ----------------------
-// MongoDB 연결
-// ----------------------
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB 연결 성공");
+    app.listen(PORT, () => {
+      console.log("Server running on port:", PORT);
+    });
   })
-  .catch((error) => {
-    console.log("MongoDB 연결 실패", error);
+  .catch((err) => {
+    console.error("MongoDB 연결 실패", err);
+    process.exit(1); // 서버 종료
   });
-
-// ----------------------
-// 서버 시작
-// ----------------------
-app.listen(PORT, () => {
-  console.log("Server running on port:", PORT);
-});

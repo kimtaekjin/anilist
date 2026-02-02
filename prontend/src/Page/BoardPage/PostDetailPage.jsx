@@ -56,7 +56,11 @@ export default function PostDetailPage() {
         setComments(res.data);
       }
     } catch (error) {
-      console.log(error);
+      if (error.response) {
+        alert(error.response.data.message);
+      } else {
+        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+      }
     }
   };
 
@@ -74,7 +78,11 @@ export default function PostDetailPage() {
         navigate("/board");
       }
     } catch (error) {
-      console.log(error);
+      if (error.response) {
+        alert(error.response.data.message);
+      } else {
+        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+      }
     }
   };
 

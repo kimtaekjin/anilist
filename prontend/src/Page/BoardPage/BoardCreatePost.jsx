@@ -68,8 +68,11 @@ export default function PostWritePage() {
         navigate("/board");
       }
     } catch (error) {
-      console.log(error);
-      alert("다시 시도해주십시오.");
+      if (error.response) {
+        alert(error.response.data.message);
+      } else {
+        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+      }
     }
   };
 

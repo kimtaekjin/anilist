@@ -1,4 +1,13 @@
 {
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -11,19 +20,12 @@
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "mongoose": "^9.0.2",
     "node-fetch": "^2.7.0",
-    "nodemon": "^3.1.11",
     "p-limit": "^7.2.0",
     "wanakana": "^5.3.1",
     "anilist": "github:qlcdmlrlf/anilist#main"
   },
-  "name": "backend",
-  "version": "1.0.0",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "devDependencies": {
+    "nodemon": "^3.1.11"
   },
   "keywords": [],
   "author": "",

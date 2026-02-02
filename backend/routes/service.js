@@ -1,5 +1,5 @@
 import express from "express";
-import Translation from "../models/Translation.js";
+import Translation from "../models/Translate.js";
 import { romajiToKatakana, translate, isRomaji, replaceMistranslation } from "../components/translateItem.js";
 
 const router = express.Router();

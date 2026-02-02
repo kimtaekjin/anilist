@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAiringAnime } from "../../Components/items/AniListQuery.jsx";
+import { fetchAiringAnime } from "../../Components/items/AniListItem.jsx";
 import { AiringSkeleton } from "../../Components/items/Skeleton";
 
 const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];

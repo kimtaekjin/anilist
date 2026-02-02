@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Building } from "lucide-react";
-import { fetchDetailAnime } from "../../Components/items/AniListQuery.jsx";
+import { fetchDetailAnime } from "../../Components/items/AniListItem.jsx";
 import { AnimeDetailSkeleton } from "../../Components/items/Skeleton";
 import StarRating from "../../Components/items/StarRating ";
 

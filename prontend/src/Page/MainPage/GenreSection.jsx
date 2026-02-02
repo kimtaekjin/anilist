@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, Building } from "lucide-react";
 import Pagination from "../../Components/Pagination/Pagination";
-import { fetchGenreAnime } from "../../Components/items/AniListQuery.jsx";
+import { fetchGenreAnime } from "../../Components/items/AniListItem.jsx";
 import { GenreSkeleton } from "../../Components/items/Skeleton";
 
 const genresList = ["액션", "로맨스", "판타지", "SF", "일상", "스포츠", "모험"];

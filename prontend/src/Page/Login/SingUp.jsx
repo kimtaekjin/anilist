@@ -4,7 +4,7 @@ import axios from "axios";
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const API = process.env.REACT_APP_CLIENT_URL;
+  const API_URL = process.env.REACT_APP_CLIENT_URL;
 
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
@@ -18,7 +18,7 @@ const SignUp = () => {
         alert("비밀번호가 일치하지 않습니다.");
         return;
       }
-      const response = await axios.post(`${API}/user/signup`, { username: nickname, email, password });
+      const response = await axios.post(`${API_URL}/user/signup`, { username: nickname, email, password });
       console.log("응", response);
 
       if (response.status === 201) {

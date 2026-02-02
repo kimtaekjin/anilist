@@ -9,14 +9,14 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const API = process.env.REACT_APP_CLIENT_URL;
+  const API_URL = process.env.REACT_APP_CLIENT_URL;
 
   const { checkAuth } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post(`${API}/user/login`, { email, password }, { withCredentials: true });
+      const response = await axios.post(`${API_URL}/user/login`, { email, password }, { withCredentials: true });
       if (response.data) {
         checkAuth();
         alert(response.data.message || "로그인 되었습니다.");

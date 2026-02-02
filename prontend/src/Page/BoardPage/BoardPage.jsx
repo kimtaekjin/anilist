@@ -6,7 +6,7 @@ import Pagination from "../../Components/Pagination/Pagination";
 
 const Board = () => {
   const navigate = useNavigate();
-  const API = process.env.REACT_APP_CLIENT_URL;
+  const API_URL = process.env.REACT_APP_CLIENT_URL;
   const { user } = useAuth();
 
   const [posts, setPosts] = useState([]);
@@ -18,14 +18,14 @@ const Board = () => {
     const fetchPosts = async () => {
       setCurrentPage(1);
       try {
-        const { data } = await axios.get(`${API}/post`);
+        const { data } = await axios.get(`${API_URL}/post`);
         setPosts(data);
       } catch (err) {
         console.error(err);
       }
     };
     fetchPosts();
-  }, []);
+  }, [API_URL]);
 
   const createPost = () => {
     if (!user) {

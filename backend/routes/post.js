@@ -67,7 +67,7 @@ function formatPostDate(createdAt) {
 // ----------------------
 router.get("/", async (req, res) => {
   try {
-    const posts = await Post.find().sort({ isNotice: -1, number: 1 });
+    const posts = await Post.find().sort({ isNotice: -1, number: -1 });
 
     const formattedPosts = posts.map((post) => ({
       ...post.toObject(),
@@ -153,6 +153,7 @@ router.put("/:id", verifyToken, async (req, res) => {
 //게시글 상세보기
 router.get("/:id", optionalVerifyToken, async (req, res) => {
   const { id } = req.params;
+  const user = req.user;
 
   try {
     const post = await Post.findById(id);
@@ -161,12 +162,13 @@ router.get("/:id", optionalVerifyToken, async (req, res) => {
     }
 
     if (req.user) {
-      const alreadyViewed = post.viewLogs.some((log) => log.userId === req.user.id);
+      const alreadyViewed = post.viewLogs.some((log) => log.userId === user.userId);
+      console.log(alreadyViewed);
 
       if (!alreadyViewed) {
         post.views += 1;
         post.viewLogs.push({
-          userId: req.user.id,
+          userId: user.userId,
         });
         await post.save();
       }

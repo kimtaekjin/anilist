@@ -25,8 +25,6 @@ const Navbar = () => {
     try {
       const response = await logout();
       if (response) {
-        console.log("확인11111111");
-
         alert(response.message || "로그아웃 되었습니다.");
         navigate("/");
       }

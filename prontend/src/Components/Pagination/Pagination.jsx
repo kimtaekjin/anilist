@@ -29,7 +29,7 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 5,
     <div className="flex justify-center mt-10 gap-2 flex-wrap">
       {/* 이전 버튼 */}
       <button
-        onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
+        onClick={() => currentPage > 1 && onPageChange(currentPage - 2)}
         className={`px-3 py-1 rounded-2xl  hover:bg-gray-100 transition ${
           currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
         }`}
@@ -53,12 +53,12 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 5,
           >
             {p}
           </button>
-        )
+        ),
       )}
 
       {/* 다음 버튼 */}
       <button
-        onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
+        onClick={() => currentPage < totalPages && onPageChange(currentPage + 2)}
         className={`px-3 py-1 rounded-2xl hover:bg-gray-100 transition ${
           currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
         }`}

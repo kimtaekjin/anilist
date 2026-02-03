@@ -49,7 +49,7 @@ router.post("/translate", async (req, res) => {
     // 오번역 교체
     translatedText = replaceMistranslation(translatedText);
 
-    // console.log("확인1:", translatedText, " :", convertedText);
+    console.log("Translate result:", translatedText);
 
     // DB 저장
     await Translation.findOneAndUpdate(

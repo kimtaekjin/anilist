@@ -25,12 +25,17 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 5,
     return pages;
   };
 
+  const changePage = (page) => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    onPageChange(page);
+  };
+
   return (
     <div className="flex justify-center mt-10 gap-2 flex-wrap">
       {/* 이전 버튼 */}
       <button
-        onClick={() => currentPage > 1 && onPageChange(currentPage - 2)}
-        className={`px-3 py-1 rounded-2xl  hover:bg-gray-100 transition ${
+        onClick={() => currentPage > 1 && changePage(Math.max(currentPage - 2, 1))}
+        className={`px-3 py-1 rounded-2xl hover:bg-gray-100 transition ${
           currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
         }`}
       >
@@ -46,7 +51,7 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 5,
         ) : (
           <button
             key={p}
-            onClick={() => onPageChange(p)}
+            onClick={() => changePage(p)}
             className={`px-3 py-1 rounded-2xl ${
               currentPage === p ? "bg-red-600 text-white" : "bg-gray-200 hover:bg-gray-300"
             }`}
@@ -58,7 +63,7 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 5,
 
       {/* 다음 버튼 */}
       <button
-        onClick={() => currentPage < totalPages && onPageChange(currentPage + 2)}
+        onClick={() => currentPage < totalPages && changePage(Math.min(currentPage + 2, totalPages))}
         className={`px-3 py-1 rounded-2xl hover:bg-gray-100 transition ${
           currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
         }`}

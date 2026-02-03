@@ -11,7 +11,7 @@ import post from "./routes/post.js";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 const allowedOrigins = [process.env.CLIENT_URL, PORT, process.env.SERVER_URL];
 

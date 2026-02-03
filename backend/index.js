@@ -13,7 +13,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = ["http://localhost:3001", "http://localhost:3000", "anilist-399q.vercel.app"];
+const allowedOrigins = ["http://localhost:3000", "http://localhost:3001", "https://anilist-399q.vercel.app"];
 
 app.use(
   cors({

@@ -29,6 +29,7 @@ const Navbar = () => {
       const response = await logout();
       if (response) {
         alert(response.message || "로그아웃 되었습니다.");
+        setMenuOpen(false);
         navigate("/");
       }
     } catch (error) {
@@ -102,16 +103,25 @@ const Navbar = () => {
                 </>
               ) : (
                 <div className="flex  space-x-2">
-                  <Link to="/user/login">
-                    <button className="px-4 py-2 border border-gray-500 rounded hover:text-gray-500 transition">
-                      로그인
-                    </button>
-                  </Link>
-                  <Link to="/user/singUp">
-                    <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
-                      회원가입
-                    </button>
-                  </Link>
+                  <button
+                    className="px-4 py-2 border border-gray-500 rounded hover:text-gray-500 transition"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/user/login");
+                    }}
+                  >
+                    로그인
+                  </button>
+
+                  <button
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/user/singUp");
+                    }}
+                  >
+                    회원가입
+                  </button>
                 </div>
               )}
             </div>

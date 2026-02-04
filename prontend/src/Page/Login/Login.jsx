@@ -8,20 +8,20 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
-  const { checkAuth, isLogin } = useAuth();
+  const { checkAuth } = useAuth();
 
   const API_URL = process.env.REACT_APP_CLIENT_URL;
 
   useEffect(() => {
     const verify = async () => {
-      await checkAuth();
-      if (isLogin) {
+      const user = await checkAuth();
+      if (user) {
         alert("접근할 수 없는 페이지입니다.");
         navigate("/");
       }
     };
     verify();
-  }, [checkAuth, isLogin, navigate]);
+  }, [checkAuth, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

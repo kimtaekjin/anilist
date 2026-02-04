@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import loginImage from "../../asset/login.jpg";
 import axios from "axios";
@@ -8,17 +8,27 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const { checkAuth, isLogin } = useAuth();
 
   const API_URL = process.env.REACT_APP_CLIENT_URL;
 
-  const { checkAuth } = useAuth();
+  useEffect(() => {
+    const verify = async () => {
+      await checkAuth();
+      if (isLogin) {
+        alert("접근할 수 없는 페이지입니다.");
+        navigate("/");
+      }
+    };
+    verify();
+  }, [checkAuth, isLogin, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const response = await axios.post(`${API_URL}/user/login`, { email, password }, { withCredentials: true });
       if (response.data) {
-        checkAuth();
+        await checkAuth();
         alert(response.data.message || "로그인 되었습니다.");
         navigate("/");
       }
@@ -60,18 +70,16 @@ const Login = () => {
               </button>
             </div>
           </form>
-          <div className="flex justify-center mt-5 ">
+          <div className="flex justify-center mt-5 " onClick={() => navigate("/user/find")}>
             <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
               비밀번호를 잃어버리셨나요?
             </p>
           </div>
 
-          <div className="flex justify-center mt-3">
-            <Link to="/singup">
-              <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
-                회원가입
-              </p>
-            </Link>
+          <div className="flex justify-center mt-3" onClick={() => navigate("/user/singUp")}>
+            <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
+              회원가입
+            </p>
           </div>
         </div>
       </div>

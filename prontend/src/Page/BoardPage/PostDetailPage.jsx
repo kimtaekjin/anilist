@@ -105,11 +105,12 @@ export default function PostDetailPage() {
       if (res.status === 200) {
         // 삭제 후 상태에서 댓글 제거
         setComments((prev) => prev.filter((c) => c._id !== commentId));
-        alert("댓글이 삭제되었습니다.");
+        alert(res.data.message);
+        console.log(res);
       }
     } catch (error) {
       console.log(error);
-      alert("댓글 삭제 실패");
+      alert(error.response.data.message);
     }
   };
 
@@ -129,14 +130,19 @@ export default function PostDetailPage() {
           </div>
 
           {/* 오른쪽 버튼 영역 (작성자만 보여줌) */}
-          {user && (post.userId.toString() === user.userId || isAdmin) && (
+          {user && (
             <div className="flex ml-3 py-1 text-gray-600 text-sm space-x-2">
-              <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
-                수정
-              </button>
-              <button type="button" className="h-2 hover:text-gray-700" onClick={handleDelete}>
-                삭제
-              </button>
+              {post.userId.toString() === user.userId && (
+                <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
+                  수정
+                </button>
+              )}
+
+              {(post.userId.toString() === user.userId || isAdmin) && (
+                <button type="button" className="h-2 hover:text-gray-700" onClick={handleDelete}>
+                  삭제
+                </button>
+              )}
             </div>
           )}
         </div>

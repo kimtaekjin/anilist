@@ -1,15 +1,28 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 
 const SignUp = () => {
   const navigate = useNavigate();
   const API_URL = process.env.REACT_APP_CLIENT_URL;
+  const { checkAuth, isLogin } = useAuth();
 
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+
+  useEffect(() => {
+    const verify = async () => {
+      await checkAuth();
+      if (isLogin) {
+        alert("접근할 수 없는 페이지입니다.");
+        navigate("/");
+      }
+    };
+    verify();
+  }, [checkAuth, isLogin, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,11 +32,10 @@ const SignUp = () => {
         return;
       }
       const response = await axios.post(`${API_URL}/user/signup`, { username: nickname, email, password });
-      console.log("응", response);
 
       if (response.status === 201) {
         alert(response.data.message);
-        navigate("/login");
+        navigate("/user/login");
       }
     } catch (error) {
       if (error.response) {

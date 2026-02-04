@@ -46,6 +46,9 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // 비밀번호 재설정
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
   {
     timestamps: true,

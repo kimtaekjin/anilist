@@ -13,6 +13,8 @@ import SingUp from "./Page/Login/SingUp";
 import Board from "./Page/BoardPage/BoardPage";
 import BoardCreatePost from "./Page/BoardPage/BoardCreatePost";
 import PostDetailPage from "./Page/BoardPage/PostDetailPage";
+import PasswordForgot from "./Page/Login/Password/Forgot";
+import ResetPassword from "./Page/Login/Password/reset";
 
 function Layout() {
   return (
@@ -52,12 +54,20 @@ const route = createBrowserRouter([
         element: <AnimeDetail />,
       },
       {
-        path: "/Login",
+        path: "/user/Login",
         element: <Login />,
       },
       {
-        path: "/singUp",
+        path: "/user/singUp",
         element: <SingUp />,
+      },
+      {
+        path: "/user/find",
+        element: <PasswordForgot />, //비밀번호 찾기
+      },
+      {
+        path: "/user/reset-password",
+        element: <ResetPassword />, //비밀번호 찾기
       },
       {
         path: "/board",

@@ -1,14 +1,14 @@
 import express from "express";
 const router = express.Router();
-
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import User from "../models/User.js"; // mongoose 모델
+import User from "../models/User.js";
+import nodemailer from "nodemailer";
 
 router.use(express.json());
 
 // 회원가입
-// ----------------------
 router.post("/signup", async (req, res) => {
   try {
     const { username, password, email } = req.body;
@@ -41,7 +41,6 @@ router.post("/signup", async (req, res) => {
 });
 
 // 로그인
-// ----------------------
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -91,7 +90,6 @@ router.post("/login", async (req, res) => {
 });
 
 // 로그아웃
-// ----------------------
 router.post("/logout", async (req, res) => {
   try {
     const token = req.cookies.token;
@@ -126,7 +124,6 @@ router.post("/logout", async (req, res) => {
 });
 
 // 토큰 검증
-// ----------------------
 router.get("/verify-token", (req, res) => {
   const token = req.cookies.token;
 
@@ -139,6 +136,78 @@ router.get("/verify-token", (req, res) => {
     return res.status(200).json({ isValid: true, user: decoded });
   } catch (error) {
     return res.status(401).json({ isValid: false, message: "유효하지 않은 토큰입니다." });
+  }
+});
+
+//비밀번호 찾기
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  // const API_URL = process.env.CLIENT_URL ;
+  const API_URL = process.env.SERVER_URL;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) return res.status(200).json({ message: "비밀번호 재설정 메일을 발송했습니다." });
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 1000 * 60 * 10;
+    await user.save();
+
+    const resetUrl = `${API_URL}/user/reset-password?token=${resetToken}`;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"Aniwiki" <${process.env.MAIL_USER}>`,
+      to: email,
+      subject: "비밀번호 재설정 안내",
+      html: `
+        <p>아래 링크를 눌러 비밀번호를 재설정하세요. (15분간 유효)</p>
+        <a href="${resetUrl}">${resetUrl}</a>
+      `,
+    });
+
+    res.status(200).json({ message: "비밀번호 재설정 메일을 발송했습니다." });
+  } catch (error) {
+    console.error("비밀번호 재설정 요청 오류:", error);
+    res.status(500).json({ message: "서버 오류" });
+  }
+});
+
+//비밀번호 변경
+router.post("/reset-password", async (req, res) => {
+  const { token, password } = req.body;
+
+  try {
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) return res.status(400).json({ message: "토큰이 유효하지 않거나 만료되었습니다." });
+
+    user.password = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.status(200).json({ message: "비밀번호가 성공적으로 변경되었습니다." });
+  } catch (error) {
+    console.error("비밀번호 재설정 오류:", error);
+    res.status(500).json({ message: "서버 오류" });
   }
 });
 

@@ -68,12 +68,12 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <Link to="/login">
+              <Link to="/user/login">
                 <button className="px-4 py-2 border border-gray-500 rounded hover:text-gray-500 transition">
                   로그인
                 </button>
               </Link>
-              <Link to="/singUp">
+              <Link to="/user/singUp">
                 <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
                   회원가입
                 </button>
@@ -102,12 +102,12 @@ const Navbar = () => {
                 </>
               ) : (
                 <div className="flex  space-x-2">
-                  <Link to="/login">
+                  <Link to="/user/login">
                     <button className="px-4 py-2 border border-gray-500 rounded hover:text-gray-500 transition">
                       로그인
                     </button>
                   </Link>
-                  <Link to="/singUp">
+                  <Link to="/user/singUp">
                     <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
                       회원가입
                     </button>

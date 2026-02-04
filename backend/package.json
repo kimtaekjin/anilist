@@ -11,6 +11,7 @@
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "mongoose": "^9.0.2",
     "node-fetch": "^2.7.0",
+    "nodemailer": "^7.0.13",
     "nodemon": "^3.1.11",
     "p-limit": "^7.2.0",
     "wanakana": "^5.3.1"

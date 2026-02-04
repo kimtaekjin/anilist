@@ -192,7 +192,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     const post = await Post.findById(id);
     if (!post) return res.status(404).json({ message: "게시글이 존재하지 않습니다." });
 
-    if (post.userId.toString() !== req.user.userId && !req.user.isAdmin) {
+    if (post.userId.toString() !== req.user.userId && !req.user.admin) {
       return res.status(403).json({ message: "삭제 권한이 없습니다." });
     }
 
@@ -258,7 +258,7 @@ router.delete("/:postId/comment/:commentId", verifyToken, async (req, res) => {
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "댓글이 존재하지 않습니다." });
 
-    if (comment.userId !== req.user.userId && !req.user.isAdmin) {
+    if (comment.userId.toString() !== req.user.userId && !req.user.admin) {
       return res.status(403).json({ message: "삭제 권한이 없습니다." });
     }
 

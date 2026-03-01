@@ -89,11 +89,11 @@ function MainPageCard({ title, animeList }) {
             ))
           : animeList.map((anime) => (
               <div
-                key={anime.id}
+                key={anime._id}
                 className="w-52 flex-shrink-0 rounded-2xl overflow-hidden shadow-lg relative  snap-start cursor-pointer"
-                onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
+                onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
               >
-                <img src={anime.image} alt={anime.title} className="w-full h-72 object-cover" />
+                <img src={anime.image?.large} alt={anime.title} className="w-full h-72 object-cover" />
                 {/* 그라데이션 + 제목 */}
                 <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/60 to-transparent p-2">
                   <h3 className="text-white font-semibold text-base line-clamp-2">{anime.title}</h3>

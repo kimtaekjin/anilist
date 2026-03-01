@@ -5,8 +5,6 @@ import { AiringSkeleton } from "../../Components/items/Skeleton";
 
 const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
 
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
-
 const Airing = () => {
   const [animeList, setAnimeList] = useState([]);
   const [selectedDay, setSelectedDay] = useState("전체");
@@ -17,25 +15,14 @@ const Airing = () => {
   useEffect(() => {
     const fetchAiring = async () => {
       try {
-        const now = Date.now();
-
-        const cachedAiring = JSON.parse(localStorage.getItem("animeList")) || { data: [], updated: 0 };
-
-        if (cachedAiring.data.length && now - cachedAiring.updated < CACHE_DURATION) {
-          setAnimeList(cachedAiring.data);
-          return;
-        }
         const processed = await fetchAiringAnime();
         setAnimeList(processed);
-
-        localStorage.setItem("animeList", JSON.stringify({ data: processed, updated: now }));
       } catch (err) {
         console.error(err);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchAiring();
   }, []);
 
@@ -67,17 +54,17 @@ const Airing = () => {
           ? Array.from({ length: 8 }).map((_, i) => <AiringSkeleton key={i} />)
           : filteredList.map((anime) => (
               <div
-                key={anime.id}
-                onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
+                key={anime._id}
+                onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
                 className="bg-white cursor-pointer rounded-2xl shadow-lg overflow-hidden
                 hover:shadow-2xl transition"
               >
-                <img src={anime.image} alt={anime.title} className="w-full h-48 object-cover" />
+                <img src={anime.image.large} alt={anime.title} className="w-full h-48 object-cover" />
                 <div className="p-4">
                   <h3 className="font-bold text-base line-clamp-2 h-12">{anime.title}</h3>
                   <div className="flex justify-between text-sm text-gray-400 mt-1">
-                    <span>{anime.year}년</span>
-                    <span>{anime.quarter}</span>
+                    <span>{anime.seasonYear}년</span>
+                    <span>{anime.season}</span>
                   </div>
                 </div>
               </div>

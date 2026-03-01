@@ -14,6 +14,8 @@ const AnimeDetail = () => {
     const fetchAnime = async () => {
       try {
         const translatedData = await fetchDetailAnime(id);
+        // console.log(translatedData);
+
         setAnime(translatedData);
       } catch (err) {
         console.error("AniList fetch error:", err);
@@ -41,7 +43,7 @@ const AnimeDetail = () => {
 
       {/* 상단 정보 */}
       <div className="flex flex-col md:flex-row gap-6 mb-6 ">
-        <img src={anime.coverImage.extraLarge} alt={anime.title} className="w-56 rounded-xl shadow-lg" />
+        <img src={anime.image.extraLarge} alt={anime.title} className="w-56 rounded-xl shadow-lg" />
 
         <div className="flex-1">
           <h1 className="text-2xl font-bold mb-2">{anime.title || anime.title.romaji}</h1>
@@ -101,9 +103,9 @@ const AnimeDetail = () => {
         <h2 className="text-2xl font-bold mb-4">캐릭터</h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
           {anime.characters.map((anime) => (
-            <div key={anime.name} className="text-center">
-              <img src={anime.image} alt={anime.name} className="w-full h-40 object-cover rounded-lg mb-1" />
-              <p className="text-sm">{anime.name}</p>
+            <div key={anime.name.native} className="text-center">
+              <img src={anime.image.large} alt={anime.name.full} className="w-full h-40 object-cover rounded-lg mb-1" />
+              <p className="text-sm">{anime.name.native}</p>
             </div>
           ))}
         </div>

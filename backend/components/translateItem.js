@@ -91,3 +91,33 @@ export function replaceMistranslation(translatedText) {
   }
   return fixed;
 }
+
+export async function traslateItem(text) {
+  const targetLang = "ko";
+
+  const originalText = text.trim();
+  let sourceLang = "auto";
+  let convertedText = originalText;
+
+  try {
+    // Romaji → Katakana
+    if (isRomaji(originalText)) {
+      sourceLang = "ja";
+      convertedText = romajiToKatakana(originalText);
+      // console.log(convertedText);
+    }
+
+    // 번역
+    let translatedText = await translate(convertedText, sourceLang, targetLang);
+
+    // 오번역 교체
+    translatedText = replaceMistranslation(translatedText);
+
+    // console.log("Translate result:", translatedText);
+
+    return translatedText;
+  } catch (err) {
+    console.error("Translation API 또는 DB 오류:", err);
+    return text;
+  }
+}

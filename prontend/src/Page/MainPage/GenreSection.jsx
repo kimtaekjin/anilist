@@ -25,13 +25,11 @@ const getCurrentSeason = () => {
   return "FALL";
 };
 
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
-
 const GenreSection = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [selectedGenres, setSelectedGenres] = useState(searchParams.get("genre")?.split(",") || []);
+  const [selectedGenres, setSelectedGenres] = useState(searchParams.get("genres")?.split(",") || []);
   const [selectedSeason, setSelectedSeason] = useState(searchParams.get("season") || getCurrentSeason());
   const [selectedYear, setSelectedYear] = useState(Number(searchParams.get("year")) || currentYear);
 
@@ -45,23 +43,10 @@ const GenreSection = () => {
       setIsLoading(true);
       setCurrentPage(1);
 
-      const now = Date.now();
-      const cacheKey = `genreAnime:${selectedSeason}:${selectedYear}`;
-
       try {
-        const cached = JSON.parse(localStorage.getItem(cacheKey));
-
-        if (cached && now - cached.updated < CACHE_DURATION) {
-          setAnimeList(cached.data);
-          setIsLoading(false);
-          return;
-        }
-
         const processed = await fetchGenreAnime(selectedSeason, selectedYear);
 
         setAnimeList(processed);
-
-        localStorage.setItem(cacheKey, JSON.stringify({ data: processed, updated: now }));
       } catch (e) {
         console.error(e);
       } finally {
@@ -75,7 +60,7 @@ const GenreSection = () => {
   /* ---------- URL Sync ---------- */
   useEffect(() => {
     const params = {};
-    if (selectedGenres.length) params.genre = selectedGenres.join(",");
+    if (selectedGenres.length) params.genres = selectedGenres.join(",");
     params.season = selectedSeason;
     params.year = selectedYear;
     setSearchParams(params);
@@ -84,7 +69,7 @@ const GenreSection = () => {
   /* ---------- 필터 ---------- */
   const filteredList = useMemo(() => {
     if (!selectedGenres.length) return animeList;
-    return animeList.filter((a) => a.genre.some((g) => selectedGenres.includes(g)));
+    return animeList.filter((a) => a.genres.some((g) => selectedGenres.includes(g)));
   }, [animeList, selectedGenres]);
 
   const currentItems = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -155,26 +140,26 @@ const GenreSection = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {currentItems.map((anime) => (
               <div
-                key={anime.id}
-                onClick={() => navigate(`/AnimeDetail/${anime.id}`)}
+                key={anime._id}
+                onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
                 className="bg-white rounded-2xl shadow-lg cursor-pointer hover:shadow-xl"
               >
-                <img src={anime.image} alt={anime.title} className="h-52 w-full object-cover rounded-t-2xl" />
+                <img src={anime.image.large} alt={anime.title} className="h-52 w-full object-cover rounded-t-2xl" />
                 <div className="p-4">
                   <div className="h-12">
                     <h3 className="font-bold mb-2 line-clamp-2">{anime.title}</h3>
                   </div>
 
                   <div className="flex flex-wrap gap-1 mb-2 items-center h-7">
-                    {anime.genre.slice(0, 3).map((g, i) => (
+                    {anime.genres?.slice(0, 3).map((g, i) => (
                       <span key={i} className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full">
                         {g}
                       </span>
                     ))}
 
-                    {anime.genre.length > 3 && (
+                    {anime.genres.length > 3 && (
                       <span className="px-[5px] py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                        +{anime.genre.length - 3}
+                        +{anime.genres.length - 3}
                       </span>
                     )}
                   </div>
@@ -183,7 +168,7 @@ const GenreSection = () => {
                     {/* 연도 */}
                     <div className="flex items-center gap-1">
                       <Calendar size={14} />
-                      <span>{anime.startYear}년</span>
+                      <span>{anime.startDate.year ? anime.startDate.year + "년" : "미정"}</span>
                     </div>
 
                     {/* 스튜디오 */}

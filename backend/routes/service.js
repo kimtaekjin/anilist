@@ -257,16 +257,18 @@ router.get("/anime/airing", async (req, res) => {
 router.get("/anime/genre", async (req, res) => {
   const { season, year } = req.query;
   const query = genreQuery;
-  console.log("요청");
 
   try {
     const cacheDuration = 24 * 60 * 60 * 1000;
     const now = new Date();
 
-    let data = await Anime.find({ contentTypes: "genre" });
+    let data = await Anime.find({ contentTypes: "genre", "startDate.year": year, season });
+
     const isStale = data.length == 0 || data.some((a) => now - a.lastSyncedAt > cacheDuration);
 
     if (data.length == 0 || isStale) {
+      console.log("확인");
+
       const response = await fetch("https://graphql.anilist.co", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -291,6 +293,7 @@ router.get("/anime/genre", async (req, res) => {
             year: anime.startDate?.year || "",
           },
           studio: anime.studios.nodes[0]?.name || "미정",
+          season,
         })),
       );
 

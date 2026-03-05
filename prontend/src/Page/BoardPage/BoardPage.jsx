@@ -18,7 +18,11 @@ const Board = () => {
     const fetchPosts = async () => {
       setCurrentPage(1);
       try {
-        const { data } = await axios.get(`${API_URL}/post`);
+        const { data } = await axios.get(`${API_URL}/post`, {
+          params: {
+            page: currentPage,
+          },
+        });
         setPosts(data);
       } catch (err) {
         console.error(err);

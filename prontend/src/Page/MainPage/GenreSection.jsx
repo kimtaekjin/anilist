@@ -168,7 +168,7 @@ const GenreSection = () => {
                     {/* 연도 */}
                     <div className="flex items-center gap-1">
                       <Calendar size={14} />
-                      <span>{anime.startDate.year ? anime.startDate.year + "년" : "미정"}</span>
+                      <span>{anime.startDate ? anime.startDate + "년" : "미정"}</span>
                     </div>
 
                     {/* 스튜디오 */}

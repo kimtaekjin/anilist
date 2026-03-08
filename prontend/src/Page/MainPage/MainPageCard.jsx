@@ -83,24 +83,24 @@ function MainPageCard({ title, animeList }) {
 
       {/* 가로 스크롤 영역 */}
       <div ref={scrollRef} className="flex space-x-4 w-full overflow-hidden snap-x snap-mandatory  scroll-smooth">
-        {animeList.length === 0
+        {(animeList ?? []).length === 0
           ? Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="w-52 h-72 rounded-2xl bg-gray-200 animate-pulse flex-shrink-0"></div>
             ))
-          : animeList.map((anime) => (
+          : (animeList ?? []).map((anime) => (
               <div
                 key={anime._id}
                 className="w-52 flex-shrink-0 rounded-2xl overflow-hidden shadow-lg relative  snap-start cursor-pointer"
                 onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
               >
                 <img src={anime.image?.large} alt={anime.title} className="w-full h-72 object-cover" />
-                {/* 그라데이션 + 제목 */}
+
                 <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/60 to-transparent p-2">
                   <h3 className="text-white font-semibold text-base line-clamp-2">{anime.title}</h3>
                 </div>
-                {/* 배지: 평점 / 에피소드 */}
+
                 <div className="absolute top-2 left-2">
-                  {anime.episodes && (
+                  {anime.episodes && anime.episodes != null && anime.episodes !== undefined && (
                     <span className="bg-gray-50 text-xs px-2 py-0.5 rounded-full font-semibold text-gray-700">
                       {anime.episodes}화
                     </span>

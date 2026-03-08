@@ -16,7 +16,7 @@ const Airing = () => {
     const fetchAiring = async () => {
       const now = new Date();
       const year = now.getFullYear();
-      const month = now.getMonth() + 1;
+      // const month = now.getMonth() + 1;
 
       try {
         const processed = await fetchAniList("airing");
@@ -34,7 +34,7 @@ const Airing = () => {
 
   const filteredList = useMemo(() => {
     if (selectedDay === "전체") return animeList;
-    return animeList.filter((anime) => anime.day === selectedDay);
+    return animeList.filter((anime) => anime.days === selectedDay);
   }, [animeList, selectedDay]);
 
   return (
@@ -69,8 +69,8 @@ const Airing = () => {
                 <div className="p-4">
                   <h3 className="font-bold text-base line-clamp-2 h-12">{anime.title}</h3>
                   <div className="flex justify-between text-sm text-gray-400 mt-1">
-                    <span>{anime.seasonYear}년</span>
-                    <span>{anime.season}</span>
+                    <span>{anime.days}요일</span>
+                    <span>{anime.episodes}화</span>
                   </div>
                 </div>
               </div>

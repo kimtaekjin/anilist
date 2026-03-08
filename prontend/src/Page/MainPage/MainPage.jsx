@@ -10,15 +10,16 @@ const MainPage = () => {
   useEffect(() => {
     const fetchAnime = async () => {
       try {
-        const [trendingAni, Completed, ovaAni] = await Promise.all([
+        const [trending, Completed, ovaAni] = await Promise.all([
           fetchAniList("trending"),
           fetchAniList("completed"),
           fetchAniList("ova"),
         ]);
+        console.log(ovaAni);
 
-        setTrendingAnime(trendingAni.slice(0, 40));
-        setCompletedAnime(Completed.slice(0, 40));
-        setOvaAnime(ovaAni.slice(0, 40));
+        setTrendingAnime(trending);
+        setCompletedAnime(Completed);
+        setOvaAnime(ovaAni);
       } catch (err) {
         console.error(err);
       }

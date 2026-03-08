@@ -36,7 +36,7 @@ export const queries = {
   ova: `
     query {
       Page(perPage: 50) {
-        media(type: ANIME, format_in: [OVA, MOVIE], sort: POPULARITY_DESC) {
+        media(type: ANIME, format_in: [OVA, MOVIE],status:FINISHED ,sort: POPULARITY_DESC) {
           id
           title { native }
           coverImage { large }
@@ -123,17 +123,25 @@ export const queries = {
           id
           title { native }
           coverImage { large }
+          episodes
           season
-          seasonYear
-          airingSchedule(perPage: 1, notYetAired: false) {
-            nodes { airingAt }
+          studios(isMain: true) {
+            nodes {
+              name
+            }
           }
+          seasonYear
+          status
+        nextAiringEpisode {
+          episode
+          airingAt
+        }
         }
       }
     }
   `,
   genre: `
-  query AiringAnime($season: MediaSeason, $year: Int, $page: Int) {
+  query ($season: MediaSeason, $year: Int, $page: Int) {
       Page(perPage: 50, page: $page) {
         pageInfo {
           hasNextPage
@@ -156,6 +164,7 @@ export const queries = {
           startDate {
             year
           }
+          season
           studios {
             nodes {
               name
@@ -167,13 +176,18 @@ export const queries = {
     }
   `,
   upcomming: `
-            query {
-            Page(perPage: 50) {
+        query ( $page: Int) {
+            Page(perPage: 50, page: $page) {
               pageInfo {
                 hasNextPage
               }
-              media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
+              media(
+              type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC
+              ) 
+              {
                 id
+                season
+                seasonYear
                 title {
                   romaji
                   english

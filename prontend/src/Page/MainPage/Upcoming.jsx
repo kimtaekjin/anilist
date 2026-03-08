@@ -1,18 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchAniList, fetchUpcommingAnime } from "../../Components/items/AniListItem.jsx";
+import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { UpcommingSkeleton } from "../../Components/items/Skeleton";
+import Pagination from "../../Components/Pagination/Pagination.jsx";
 
 const Upcoming = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [animeList, setAnimeList] = useState([]);
   const navigate = useNavigate();
 
+  const itemsPerPage = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentItems = animeList.slice(startIndex, startIndex + itemsPerPage);
+
   useEffect(() => {
     const fetchUpcomingAnime = async () => {
       setIsLoading(true);
-
+      setCurrentPage(1);
       try {
         const data = await fetchAniList("upcomming");
         console.log(data);
@@ -46,7 +53,7 @@ const Upcoming = () => {
 
       {!isLoading && animeList.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {animeList.map((anime) => (
+          {currentItems.map((anime) => (
             <div
               key={anime._id}
               onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
@@ -87,7 +94,7 @@ const Upcoming = () => {
 
                   <div className="flex items-center gap-1">
                     <Building size={14} className="text-gray-400" />
-                    <span>{anime.studio}</span>
+                    <span>{anime?.studio?.[0] || "미정"}</span>
                   </div>
                 </div>
               </div>
@@ -95,6 +102,12 @@ const Upcoming = () => {
           ))}
         </div>
       )}
+      <Pagination
+        currentPage={currentPage}
+        totalItems={animeList.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

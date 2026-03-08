@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAiringAnime } from "../../Components/items/AniListItem.jsx";
+import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { AiringSkeleton } from "../../Components/items/Skeleton";
 
 const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
@@ -14,9 +14,15 @@ const Airing = () => {
 
   useEffect(() => {
     const fetchAiring = async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+
       try {
-        const processed = await fetchAiringAnime();
-        setAnimeList(processed);
+        const processed = await fetchAniList("airing");
+        const filtered = processed.filter((ani) => ani.seasonYear === year);
+
+        setAnimeList(filtered);
       } catch (err) {
         console.error(err);
       } finally {

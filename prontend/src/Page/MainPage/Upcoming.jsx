@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchUpcommingAnime } from "../../Components/items/AniListItem.jsx";
+import { fetchAniList, fetchUpcommingAnime } from "../../Components/items/AniListItem.jsx";
 import { UpcommingSkeleton } from "../../Components/items/Skeleton";
 
 const Upcoming = () => {
@@ -14,7 +14,9 @@ const Upcoming = () => {
       setIsLoading(true);
 
       try {
-        const data = await fetchUpcommingAnime();
+        const data = await fetchAniList("upcomming");
+        console.log(data);
+
         setAnimeList(data);
       } catch (err) {
         console.error(err);

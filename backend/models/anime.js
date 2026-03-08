@@ -16,6 +16,7 @@ const anime = new mongoose.Schema({
   image: {
     large: { type: String, default: "" },
     extraLarge: { type: String, default: "" },
+    banner: { type: String, default: "" },
   },
   bannerImage: String,
   genres: [String],

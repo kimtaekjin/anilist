@@ -2,41 +2,14 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_CLIENT_URL;
 
-export const fetchTrendingAnime = async () => {
-  const response = await axios.get(`${API_URL}/service/anime/trending`);
-
-  return response.data;
-};
-
-export const fetchCompletedAnime = async () => {
-  const response = await axios.get(`${API_URL}/service/anime/completed`);
-
-  return response.data;
-};
-
-export const fetchOVAAnime = async () => {
-  const response = await axios.get(`${API_URL}/service/anime/ova`);
-  return response.data;
-};
-
-export const fetchAiringAnime = async () => {
-  const response = await axios.get(`${API_URL}/service/anime/airing`);
-  return response.data;
-};
-
-export const fetchGenreAnime = async (selectedSeason, selectedYear) => {
-  const response = await axios.get(`${API_URL}/service/anime/genre`, {
-    params: {
-      season: selectedSeason,
-      year: selectedYear,
-    },
+export const fetchAniList = async (type, selectedSeason, selectedYear) => {
+  const body = {
+    season: selectedSeason,
+    year: selectedYear,
+  };
+  const response = await axios.get(`${API_URL}/service/anime/${type}`, {
+    params: body,
   });
-
-  return response.data;
-};
-
-export const fetchUpcommingAnime = async () => {
-  const response = await axios.get(`${API_URL}/service/anime/upcomming`);
 
   const data = response.data.map((e) => {
     if (e.startDate) {
@@ -47,15 +20,18 @@ export const fetchUpcommingAnime = async () => {
     }
     return e;
   });
+  console.log("1", data);
 
   return data;
 };
 
-export const fetchDetailAnime = async (id) => {
-  const response = await axios.get(`${API_URL}/service/anime/detail`, {
-    params: {
-      id,
-    },
+export const fetchDetailAnime = async (type, id) => {
+  const body = {
+    type,
+  };
+  const response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
+    params: body,
   });
-  return response.data;
+
+  return response.data[0];
 };

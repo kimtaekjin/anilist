@@ -1,5 +1,5 @@
-//추천애니
-export const trendingQuery = `
+export const queries = {
+  trending: `
   query {
     Page(perPage: 50) {
       media(type: ANIME, format: TV, sort: POPULARITY_DESC) {
@@ -15,10 +15,9 @@ export const trendingQuery = `
       }
     }
   }
-`;
+`,
 
-//완결애니
-export const completedQuery = `
+  completed: `
     query {
       Page(perPage: 50) {
         media(type: ANIME, format: TV, sort: TRENDING_DESC, status: FINISHED) {
@@ -32,11 +31,10 @@ export const completedQuery = `
           popularity
         }
       }
-    }`;
+    }`,
 
-//ova 및 극장애니
-export const ovaQuery = `
-   query {
+  ova: `
+    query {
       Page(perPage: 50) {
         media(type: ANIME, format_in: [OVA, MOVIE], sort: POPULARITY_DESC) {
           id
@@ -48,97 +46,10 @@ export const ovaQuery = `
           popularity
         }
       }
-    }`;
+    }`,
 
-//방영애니
-export const airingQuery = `
-     query AiringAnime($season: MediaSeason, $year: Int, $page: Int) {
-      Page(perPage: 50, page: $page) {
-        pageInfo {
-          hasNextPage
-        }
-        media(
-          type: ANIME
-          status: RELEASING
-          season: $season
-          seasonYear: $year
-        ) {
-          id
-          title { native }
-          coverImage { large }
-          season
-          seasonYear
-          airingSchedule(perPage: 1, notYetAired: false) {
-            nodes { airingAt }
-          }
-        }
-      }
-    }
-  `;
-//장르별애니
-export const genreQuery = `
-   query SeasonAnime($season: MediaSeason, $year: Int) {
-      Page(perPage: 100) {
-        media(
-          type: ANIME
-          season: $season
-          seasonYear: $year
-          sort: POPULARITY_DESC
-        ) {
-          id
-          title {
-            romaji
-            english
-            native
-          }
-          coverImage {
-            large
-          }
-          startDate {
-            year
-          }
-          studios {
-            nodes {
-              name
-            }
-          }
-          genres
-        }
-      }
-    }
-  `;
-
-export const upcommingQuery = `
-            query {
-            Page(perPage: 50) {
-              media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
-                id
-                title {
-                  romaji
-                  english
-                  native
-                }
-                coverImage {
-                  large
-                }
-                genres
-                startDate {
-                  year
-                  month
-                  day
-                }
-                studios(isMain: true) {
-                  nodes {
-                    name
-                  }
-                }
-              }
-            }
-          }
-        `;
-
-export const detailQuery = `
- query ($id: Int!) {
+  detail: `
+     query ($id: Int!) {
       Media(id: $id, type: ANIME) {
         id
         idMal
@@ -196,4 +107,94 @@ export const detailQuery = `
         }
       }
     }
-  `;
+  `,
+  airing: `
+     query AiringAnime($season: MediaSeason, $year: Int, $page: Int) {
+      Page(perPage: 50, page: $page) {
+        pageInfo {
+          hasNextPage
+        }
+        media(
+          type: ANIME
+          status: RELEASING
+          season: $season
+          seasonYear: $year
+        ) {
+          id
+          title { native }
+          coverImage { large }
+          season
+          seasonYear
+          airingSchedule(perPage: 1, notYetAired: false) {
+            nodes { airingAt }
+          }
+        }
+      }
+    }
+  `,
+  genre: `
+  query AiringAnime($season: MediaSeason, $year: Int, $page: Int) {
+      Page(perPage: 50, page: $page) {
+        pageInfo {
+          hasNextPage
+        }
+        media(
+          type: ANIME
+          season: $season
+          seasonYear: $year
+          sort: POPULARITY_DESC
+        ) {
+          id
+          title {
+            romaji
+            english
+            native
+          }
+          coverImage {
+            large
+          }
+          startDate {
+            year
+          }
+          studios {
+            nodes {
+              name
+            }
+          }
+          genres
+        }
+      }
+    }
+  `,
+  upcomming: `
+            query {
+            Page(perPage: 50) {
+              pageInfo {
+                hasNextPage
+              }
+              media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
+                id
+                title {
+                  romaji
+                  english
+                  native
+                }
+                coverImage {
+                  large
+                }
+                genres
+                startDate {
+                  year
+                  month
+                  day
+                }
+                studios(isMain: true) {
+                  nodes {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        `,
+};

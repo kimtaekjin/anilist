@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Building } from "lucide-react";
 import { fetchDetailAnime } from "../../Components/items/AniListItem.jsx";
 import { AnimeDetailSkeleton } from "../../Components/items/Skeleton";
-import StarRating from "../../Components/items/StarRating ";
+import StarRating from "../../Components/items/StarRating";
 
 const AnimeDetail = () => {
   const { id } = useParams();
@@ -13,9 +13,8 @@ const AnimeDetail = () => {
   useEffect(() => {
     const fetchAnime = async () => {
       try {
-        const translatedData = await fetchDetailAnime(id);
-        // console.log(translatedData);
-
+        const translatedData = await fetchDetailAnime("detail", id);
+        console.log(translatedData);
         setAnime(translatedData);
       } catch (err) {
         console.error("AniList fetch error:", err);
@@ -28,49 +27,60 @@ const AnimeDetail = () => {
   }, [id]);
 
   if (loading) return <AnimeDetailSkeleton />;
-  if (!anime) return <p className="text-center py-20">데이터를 불러올 수 없습니다.</p>;
 
-  // 🔥 현재 방영 화수 계산
+  if (!anime) {
+    return <p className="text-center py-20">데이터를 불러올 수 없습니다.</p>;
+  }
+
+  // 현재 방영 화수
   const currentEpisode =
     anime.status === "RELEASING" && anime.nextAiringEpisode ? anime.nextAiringEpisode.episode - 1 : anime.episodes;
 
   return (
     <div className="container mx-auto px-4 py-10">
       {/* 배너 */}
-      {anime.bannerImage && (
-        <img src={anime.bannerImage} alt={anime.title.romaji} className="w-full h-72 object-cover rounded-2xl mb-6" />
+      {anime?.image?.banner && (
+        <img
+          src={anime.image.banner}
+          alt={anime?.title?.native || anime?.title?.romaji}
+          className="w-full h-72 object-cover rounded-2xl mb-6"
+        />
       )}
 
       {/* 상단 정보 */}
-      <div className="flex flex-col md:flex-row gap-6 mb-6 ">
-        <img src={anime.image.extraLarge} alt={anime.title} className="w-56 rounded-xl shadow-lg" />
+      <div className="flex flex-col md:flex-row gap-6 mb-6">
+        <img src={anime?.image?.large} alt={anime?.title} className="w-56 rounded-xl shadow-lg" />
 
         <div className="flex-1">
-          <h1 className="text-2xl font-bold mb-2">{anime.title || anime.title.romaji}</h1>
+          <h1 className="text-2xl font-bold mb-2">{anime?.title || ""}</h1>
+
           <p className="text-gray-500 mb-4">
-            {anime.season} {anime.seasonYear} ·{" "}
-            {anime.status === "RELEASING" ? (
+            {anime?.season} {anime?.seasonYear} ·{" "}
+            {anime?.status === "RELEASING" ? (
               <span className="text-red-500 font-semibold">{currentEpisode}화 방영중</span>
             ) : (
               <span>
-                {anime.episodes
+                {anime?.episodes
                   ? `${anime.episodes}화 완결`
-                  : anime.startdate
-                    ? `${anime.startdate} 방영 예정`
+                  : anime?.startDate
+                    ? `${anime.startDate.year}.${anime.startDate.month}.${anime.startDate.day} 방영 예정`
                     : "방영일 미정"}
               </span>
             )}
           </p>
+
           <div className="flex items-center gap-1">
-            <Building size={14} className="text-gray-400" /> {anime.studios.edges[0]?.node.name || "미정"}
+            <Building size={14} className="text-gray-400" />
+            {anime?.studio || "미정"}
           </div>
+
           <div className="flex items-center gap-2 mx-4 my-2">
-            <StarRating score={anime.averageScore} size={18} showText={true} />
+            <StarRating score={anime?.averageScore} size={18} showText />
           </div>
 
           {/* 장르 */}
           <div className="flex flex-wrap gap-2 mb-4">
-            {anime.genres.map((genre) => (
+            {anime?.genres?.map((genre) => (
               <span key={genre} className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm">
                 {genre}
               </span>
@@ -82,11 +92,11 @@ const AnimeDetail = () => {
       {/* 줄거리 */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold mb-2">줄거리</h2>
-        <p className="leading-relaxed text-gray-700" dangerouslySetInnerHTML={{ __html: anime.description }} />
+        <p className="leading-relaxed text-gray-700" dangerouslySetInnerHTML={{ __html: anime?.description }} />
       </div>
 
       {/* 트레일러 */}
-      {anime.trailer && anime.trailer.site === "youtube" && (
+      {anime?.trailer?.site === "youtube" && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2">트레일러</h2>
           <iframe
@@ -101,11 +111,16 @@ const AnimeDetail = () => {
       {/* 캐릭터 */}
       <div>
         <h2 className="text-2xl font-bold mb-4">캐릭터</h2>
+
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-          {anime.characters.map((anime) => (
-            <div key={anime.name.native} className="text-center">
-              <img src={anime.image.large} alt={anime.name.full} className="w-full h-40 object-cover rounded-lg mb-1" />
-              <p className="text-sm">{anime.name.native}</p>
+          {anime?.characters?.map((character) => (
+            <div key={character?.name?.full} className="text-center">
+              <img
+                src={character?.image?.large}
+                alt={character?.name?.full}
+                className="w-full h-40 object-cover rounded-lg mb-1"
+              />
+              <p className="text-sm">{character?.name?.native}</p>
             </div>
           ))}
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchTrendingAnime, fetchCompletedAnime, fetchOVAAnime } from "../../Components/items/AniListItem";
+import { fetchAniList } from "../../Components/items/AniListItem";
 import MainPageCard from "./MainPageCard";
 
 const MainPage = () => {
@@ -11,15 +11,14 @@ const MainPage = () => {
     const fetchAnime = async () => {
       try {
         const [trendingAni, Completed, ovaAni] = await Promise.all([
-          fetchTrendingAnime(),
-          fetchCompletedAnime(),
-          fetchOVAAnime(),
+          fetchAniList("trending"),
+          fetchAniList("completed"),
+          fetchAniList("ova"),
         ]);
 
-        setTrendingAnime(trendingAni);
-        setCompletedAnime(Completed);
-
-        setOvaAnime(ovaAni);
+        setTrendingAnime(trendingAni.slice(0, 40));
+        setCompletedAnime(Completed.slice(0, 40));
+        setOvaAnime(ovaAni.slice(0, 40));
       } catch (err) {
         console.error(err);
       }

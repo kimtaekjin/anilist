@@ -35,25 +35,48 @@ export const fetchAniList = async (type, selectedSeason, selectedYear) => {
 };
 
 export const fetchDetailAnime = async (type, id) => {
-  const body = { type };
-
   try {
-    let response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
-      params: body,
-    });
+    const response = await axios.get(`${API_URL}/service/anime/detail/${id}`, { params: { type } });
+    let animeData = response.data;
 
-    const anime = response.data;
-
-    // startDate 포맷
-    if (anime.startDate) {
-      const year = anime.startDate.year ?? "";
-      const month = anime.startDate.month ? String(anime.startDate.month).padStart(2, "0") : "";
-      const day = anime.startDate.day ? String(anime.startDate.day).padStart(2, "0") : "";
-      anime.startDate = `${year}${month ? "-" + month : ""}${day ? "-" + day : ""}`;
+    // response가 배열인지 단일 객체인지 체크
+    if (Array.isArray(animeData)) {
+      animeData = animeData[0];
     }
 
-    return anime;
+    // startDate 포맷
+    if (animeData.startDate) {
+      const { year = "", month, day } = animeData.startDate;
+      animeData.startDate = `${year}${month ? "-" + String(month).padStart(2, "0") : ""}${day ? "-" + String(day).padStart(2, "0") : ""}`;
+    }
+
+    return animeData;
   } catch (error) {
-    console.error("error:", error);
+    console.error(error);
   }
 };
+
+// export const fetchDetailAnime = async (type, id) => {
+//   const body = { type };
+
+//   try {
+//     let response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
+//       params: body,
+//     });
+
+//     const anime = response.data;
+
+//     // startDate 포맷
+//     if (anime.startDate) {
+//       const year = anime.startDate.year ?? "";
+//       const month = anime.startDate.month ? String(anime.startDate.month).padStart(2, "0") : "";
+//       const day = anime.startDate.day ? String(anime.startDate.day).padStart(2, "0") : "";
+//       anime.startDate = `${year}${month ? "-" + month : ""}${day ? "-" + day : ""}`;
+//     }
+//     console.log("1", anime);
+
+//     return anime;
+//   } catch (error) {
+//     console.error("error:", error);
+//   }
+// };

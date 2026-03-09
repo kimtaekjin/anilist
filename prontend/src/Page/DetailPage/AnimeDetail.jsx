@@ -14,6 +14,8 @@ const AnimeDetail = () => {
     const fetchAnime = async () => {
       try {
         const translatedData = await fetchDetailAnime("detail", id);
+        console.log(translatedData);
+
         setAnime(translatedData);
       } catch (err) {
         console.error("AniList fetch error:", err);
@@ -62,7 +64,7 @@ const AnimeDetail = () => {
                 {anime?.episodes
                   ? `${anime.episodes}화 완결`
                   : anime?.startDate
-                    ? `${anime.startDate.year}.${anime.startDate.month}.${anime.startDate.day} 방영 예정`
+                    ? `${anime.startDate} 방영 예정`
                     : "방영일 미정"}
               </span>
             )}

@@ -15,7 +15,6 @@ const MainPage = () => {
           fetchAniList("completed"),
           fetchAniList("ova"),
         ]);
-        console.log(ovaAni);
 
         setTrendingAnime(trending);
         setCompletedAnime(Completed);

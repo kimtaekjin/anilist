@@ -35,27 +35,25 @@ export const fetchAniList = async (type, selectedSeason, selectedYear) => {
 };
 
 export const fetchDetailAnime = async (type, id) => {
-  const body = {
-    type,
-  };
+  const body = { type };
+
   try {
     let response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
       params: body,
     });
-    console.log(response.data);
 
-    // response.data.map((e) => {
-    //   if (e.startDate) {
-    //     const year = e.startDate.year ?? "";
-    //     const month = e.startDate.month ? String(e.startDate.month).padStart(2, "0") : "";
-    //     const day = e.startDate.day ? String(e.startDate.day).padStart(2, "0") : "";
-    //     e.startDate = `${year}${month ? "-" + month : ""}${day ? "-" + day : ""}`;
-    //   }
+    const anime = response.data;
 
-    //   return e;
-    // });
-    return response.data;
+    // startDate 포맷
+    if (anime.startDate) {
+      const year = anime.startDate.year ?? "";
+      const month = anime.startDate.month ? String(anime.startDate.month).padStart(2, "0") : "";
+      const day = anime.startDate.day ? String(anime.startDate.day).padStart(2, "0") : "";
+      anime.startDate = `${year}${month ? "-" + month : ""}${day ? "-" + day : ""}`;
+    }
+
+    return anime;
   } catch (error) {
-    console.log("error:", error);
+    console.error("error:", error);
   }
 };

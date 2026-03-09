@@ -12,20 +12,20 @@ export const fetchAniList = async (type, selectedSeason, selectedYear) => {
       params: body,
     });
 
-    // response.data.map((e) => {
-    //   if (e.startDate) {
-    //     const year = e.startDate.year ?? "";
-    //     const month = e.startDate.month ? String(e.startDate.month).padStart(2, "0") : "";
-    //     const day = e.startDate.day ? String(e.startDate.day).padStart(2, "0") : "";
-    //     e.startDate = `${year}${month ? "-" + month : ""}${day ? "-" + day : ""}`;
-    //   }
+    response.data.map((e) => {
+      if (e.startDate) {
+        const year = e.startDate.year ?? "";
+        const month = e.startDate.month ? String(e.startDate.month).padStart(2, "0") : "";
+        const day = e.startDate.day ? String(e.startDate.day).padStart(2, "0") : "";
+        e.startDate = `${year}${month ? "-" + month : ""}${day ? "-" + day : ""}`;
+      }
 
-    //   if (type === "ova") {
-    //     e.episodes = "";
-    //   }
+      if (type === "ova") {
+        e.episodes = "";
+      }
 
-    //   return e;
-    // });
+      return e;
+    });
     console.log("type:", type, "DATA:", response.data);
 
     return response.data;

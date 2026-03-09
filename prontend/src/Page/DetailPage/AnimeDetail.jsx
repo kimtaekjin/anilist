@@ -14,7 +14,7 @@ const AnimeDetail = () => {
     const fetchAnime = async () => {
       try {
         const translatedData = await fetchDetailAnime("detail", id);
-        console.log(translatedData);
+        // console.log(translatedData);
 
         setAnime(translatedData);
       } catch (err) {

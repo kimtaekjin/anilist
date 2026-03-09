@@ -26,7 +26,7 @@ export const fetchAniList = async (type, selectedSeason, selectedYear) => {
 
       return e;
     });
-    console.log("type:", type, "DATA:", response.data);
+    // console.log("type:", type, "DATA:", response.data);
 
     return response.data;
   } catch (error) {

@@ -26,13 +26,12 @@ export const fetchAniList = async (type, selectedSeason, selectedYear) => {
 
     //   return e;
     // });
+    console.log("type:", type, "DATA:", response.data);
+
+    return response.data;
   } catch (error) {
-    console.error("error:", err);
+    console.error("error:", error);
   }
-
-  console.log("type:", type, "DATA:", response.data);
-
-  return response.data;
 };
 
 export const fetchDetailAnime = async (type, id) => {
@@ -54,9 +53,8 @@ export const fetchDetailAnime = async (type, id) => {
 
       return e;
     });
+    return response.data[0];
   } catch (error) {
     console.log("error:", error);
   }
-
-  return response.data[0];
 };

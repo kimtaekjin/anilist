@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Pagination from "../../Components/Pagination/Pagination";
@@ -29,7 +29,7 @@ const Board = () => {
       }
     };
     fetchPosts();
-  }, [API_URL]);
+  }, [API_URL, currentPage]);
 
   const createPost = () => {
     if (!user) {

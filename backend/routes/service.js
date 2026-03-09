@@ -184,6 +184,7 @@ async function fetchDetail(query, type, id) {
 
   const res = await response.json();
   const data = res?.data?.Media;
+  console.log(data);
 
   if (!data) {
     throw new Error("AniList 데이터 없음");
@@ -217,6 +218,10 @@ async function fetchDetail(query, type, id) {
         })),
       )
     : [];
+
+  if (data.status == "NOT_YET_RELEASED") {
+    data.episodes = ""; //방영 예정인데 에피소드가 들어가 있는 데이터가 있다 이유 아직 모름
+  }
 
   const result = {
     _id: data.id,

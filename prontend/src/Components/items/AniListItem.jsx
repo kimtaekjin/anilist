@@ -33,11 +33,11 @@ export const fetchDetailAnime = async (type, id) => {
   const body = {
     type,
   };
-  const response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
+  let response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
     params: body,
   });
 
-  const data = response.data.map((e) => {
+  response.data.map((e) => {
     if (e.startDate) {
       const year = e.startDate.year ?? "";
       const month = e.startDate.month ? String(e.startDate.month).padStart(2, "0") : "";
@@ -47,7 +47,6 @@ export const fetchDetailAnime = async (type, id) => {
 
     return e;
   });
-  console.log("1", data);
 
   return response.data[0];
 };

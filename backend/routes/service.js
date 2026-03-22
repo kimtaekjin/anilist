@@ -15,13 +15,31 @@ function getDay(airingAt) {
   return days[date.getDay()];
 }
 
-const MAX_CONCURRENT_TRANSLATIONS = 14; // 동시에 처리할 번역 갯수 제한
-const MAX_CONCURRENT_DB_UPDATES = 40; // 동시에 처리할 DB 업데이트 갯수 제한 이 부분 다시 복습하기
+const MAX_CONCURRENT_TRANSLATIONS = 10;
+const MAX_CONCURRENT_DB_UPDATES = 30;
+const MAX_PAGE_CONCURRENCY = 3;
+const SINGLE_BATCH_TYPES = ["trending", "completed", "ova"];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const REQUEST_DELAY = 500;
+
+async function limitConcurrency(items, limit, asyncFn) {
+  const results = [];
+  const queue = [...items];
+
+  const workers = Array.from({ length: limit }, async () => {
+    while (queue.length) {
+      const item = queue.shift();
+      results.push(await asyncFn(item));
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
 
 async function fetchAnime(query, type, body = {}) {
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const REQUEST_DELAY = 500;
-
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -34,140 +52,149 @@ async function fetchAnime(query, type, body = {}) {
   const variables = {
     season: (body.season || defaultSeason).toUpperCase(),
     year: body.year || year,
-    page,
   };
 
-  //  모든 페이지 순차적으로 가져오기
-  while (hasNextPage) {
+  async function fetchPage(page, retryCount = 0) {
     try {
       const response = await fetch(ANILIST_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, variables }),
+        body: JSON.stringify({
+          query,
+          variables: { ...variables, page },
+        }),
       });
-
       const json = await response.json();
-      const pageData = json.data?.Page;
 
-      // console.log(pageData);
-      console.log(`[${type}] NextPage: ${hasNextPage} page++: ${variables.page}`);
+      // 429 체크를 pageData 추출 전에 먼저 수행
+      if (json.errors?.some((e) => e.status === 429)) {
+        if (retryCount < 5) {
+          const delay = 2000 * (retryCount + 1); // 점진적 백오프
+          console.log(`Rate limited, retrying page ${page} after ${delay}ms... (attempt ${retryCount + 1})`);
+          await sleep(delay);
+          return fetchPage(page, retryCount + 1);
+        } else {
+          console.error(`Page ${page} failed after 5 retries`);
+          return null;
+        }
+      }
+
+      const pageData = json.data?.Page;
 
       if (!pageData) {
         console.error("AniList response error:", json);
-        break;
+        return null;
       }
 
-      allMedia.push(...(pageData.media || []));
+      console.log(`[${type}] page: ${page}, hasNextPage: ${pageData.pageInfo?.hasNextPage}`);
 
-      if (type == "trending" || type == "completed" || type == "ova") {
-        break;
-      }
-
-      hasNextPage = pageData.pageInfo.hasNextPage;
-      variables.page++;
-      if (hasNextPage) await sleep(REQUEST_DELAY);
-    } catch (err) {
-      console.error("AniList fetch error:", err);
-      break;
+      return pageData;
+    } catch (error) {
+      console.error("fetch error", error);
+      return null;
     }
   }
 
-  //  trending 필터 적용
-  const filteredMedia = allMedia.filter((anime) => {
+  // 모든 페이지 순차적으로 가져오기
+  while (hasNextPage) {
+    const pages = [];
+    for (let i = 0; i < MAX_PAGE_CONCURRENCY; i++) {
+      pages.push(page++);
+    }
+
+    const results = await Promise.all(pages.map(fetchPage));
+
+    // trending / completed / ova 는 첫 배치만 가져오고 종료
+    if (SINGLE_BATCH_TYPES.includes(type)) {
+      for (const pageData of results) {
+        if (pageData) allMedia.push(...pageData.media);
+      }
+      break;
+    }
+
+    for (const pageData of results) {
+      if (!pageData) continue;
+      allMedia.push(...pageData.media);
+    }
+
+    // 마지막으로 유효한 pageData의 hasNextPage 기준으로 판단
+    const lastValidResult = [...results].reverse().find(Boolean);
+    hasNextPage = lastValidResult?.pageInfo?.hasNextPage ?? false;
+
+    await sleep(REQUEST_DELAY);
+  }
+
+  // anime.id 기준으로 중복 제거 (anime._id는 DB 저장 후 생기는 필드)
+  const uniqueMedia = Array.from(new Map(allMedia.map((anime) => [anime.id, anime])).values());
+
+  // trending 필터 적용
+  const filteredMedia = uniqueMedia.filter((anime) => {
     if (type === "trending") return anime.averageScore >= 70 && anime.popularity >= 80000;
     return true;
   });
 
-  //  데이터 매핑 및 번역 (concurrency 제한)
   async function processAnime(anime) {
     const airingAt = anime.nextAiringEpisode?.airingAt;
-    let currentEpisode =
+    const currentEpisode =
       anime.nextAiringEpisode?.episode !== undefined ? anime.nextAiringEpisode.episode - 1 : anime.episodes || null;
 
-    // 장르 번역 제한
-    const genres = anime.genres ? await limitConcurrency(anime.genres, MAX_CONCURRENT_TRANSLATIONS, traslateItem) : [];
+    // 번역 실패 시 fallback 처리
+    const genres = anime.genres
+      ? await limitConcurrency(anime.genres, MAX_CONCURRENT_TRANSLATIONS, (genre) =>
+          traslateItem(genre).catch(() => genre),
+        )
+      : [];
 
-    // 타이틀 번역
-    const title = anime.title?.native ? await traslateItem(anime.title.native) : anime.title?.romaji || "";
-    // console.log(anime);
+    const title = anime.title?.native
+      ? await traslateItem(anime.title.native).catch(() => anime.title?.romaji || "")
+      : anime.title?.romaji || "";
 
     return {
       _id: anime.id,
-
-      title: title,
-
+      title,
       image: {
         large: anime.coverImage?.large || "",
         extraLarge: anime.coverImage?.extraLarge || "",
         banner: anime.bannerImage || "",
       },
-
       bannerImage: anime.bannerImage || "",
-
       status: anime.status || "",
-
-      genres: genres || [],
-
+      genres,
       episodes: currentEpisode || 0,
-
       type: anime.format || "",
-
       seasonYear: anime.seasonYear || null,
-
       season: anime.season || "",
-
       startDate: {
         year: anime.startDate?.year || null,
         month: anime.startDate?.month || null,
         day: anime.startDate?.day || null,
       },
-
       studio: anime.studios?.nodes?.map((s) => s.name) || ["미정"],
-
       days: airingAt ? getDay(airingAt) : "",
-
       averageScore: anime.averageScore || 0,
       popularity: anime.popularity || 0,
-
-      nextAiringEpisode: anime.nextAiringEpisode
-        ? {
-            episode: currentEpisode,
-            airingAt: airingAt,
-          }
-        : null,
-
+      nextAiringEpisode: anime.nextAiringEpisode ? { episode: currentEpisode, airingAt } : null,
       updatedAt: anime.updatedAt || null,
-
       lastSyncedAt: new Date(),
     };
   }
 
-  // 4️⃣ concurrency 제한 함수
-  async function limitConcurrency(items, limit, asyncFn) {
-    const results = [];
-    const queue = [...items];
-
-    const workers = Array.from({ length: limit }, async () => {
-      while (queue.length) {
-        const item = queue.shift();
-        results.push(await asyncFn(item));
-      }
-    });
-
-    await Promise.all(workers);
-    return results;
-  }
-
   const media = await limitConcurrency(filteredMedia, MAX_CONCURRENT_TRANSLATIONS, processAnime);
 
-  // 5️⃣ DB 업데이트도 concurrency 제한
   await limitConcurrency(media, MAX_CONCURRENT_DB_UPDATES, async (anime) => {
-    return Anime.updateOne({ _id: anime._id }, { $set: anime, $addToSet: { contentTypes: type } }, { upsert: true });
+    try {
+      return await Anime.updateOne(
+        { _id: anime._id },
+        { $set: anime, $addToSet: { contentTypes: type } },
+        { upsert: true },
+      );
+    } catch (error) {
+      console.error(`DB update failed for anime _id: ${anime._id}`, error);
+    }
   });
 
   return media;
 }
-
 async function fetchDetail(query, type, id) {
   const response = await fetch(ANILIST_ENDPOINT, {
     method: "POST",
@@ -324,7 +351,6 @@ router.get("/anime/:type", async (req, res) => {
       });
     } else if (type == "genre") {
       data = await Anime.find({ contentTypes: type, "startDate.year": year, season });
-      console.log("여기 안오니?");
     } else if (type == "airing") {
       data = await Anime.find({ contentTypes: type, status: "RELEASING" });
     } else {
@@ -333,7 +359,7 @@ router.get("/anime/:type", async (req, res) => {
 
     const isStale = data.length == 0 || data.some((a) => now - a.lastSyncedAt > cacheDuration);
 
-    if (data.length == 0 || isStale) {
+    if (data.length === 0 || isStale) {
       const media = await fetchAnime(queries[type], type, body);
       data = media;
     }

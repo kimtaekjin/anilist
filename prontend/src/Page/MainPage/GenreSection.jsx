@@ -4,8 +4,65 @@ import { Calendar, Building } from "lucide-react";
 import Pagination from "../../Components/Pagination/Pagination";
 import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { GenreSkeleton } from "../../Components/items/Skeleton";
+import Select from "react-select";
 
 const genresList = ["액션", "로맨스", "판타지", "SF", "일상", "스포츠", "모험"];
+const genreOptions = genresList.map((g) => ({ value: g, label: g }));
+
+const customStyles = {
+  control: (provided) => ({
+    ...provided,
+    minHeight: "40px",
+    borderRadius: "9999px", // 둥근 테두리
+    borderColor: "#ccc",
+    boxShadow: "none",
+    paddingLeft: "5px",
+    paddingRight: "8px",
+    cursor: "pointer",
+    "&:hover": {
+      borderColor: "#ccc",
+    },
+  }),
+  menu: (provided) => ({
+    ...provided,
+    borderRadius: "12px",
+    marginTop: 4,
+    padding: 4,
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    borderRadius: "9999px",
+    padding: "8px 16px",
+    margin: "4px 0",
+    backgroundColor: state.isSelected
+      ? "#dc2626" // bg-red-600
+      : state.isFocused
+        ? "#e5e7eb" // bg-gray-300
+        : "#e5e7eb40", // bg-gray-200 반투명 느낌
+    color: state.isSelected ? "#fff" : "#111827", // text-white / text-gray-900
+    cursor: "pointer",
+  }),
+  multiValue: (provided) => ({
+    ...provided,
+    backgroundColor: "#dc2626", // 선택된 태그 빨강
+    borderRadius: "9999px",
+    padding: "3px 8px",
+    color: "#fff",
+  }),
+  multiValueLabel: (provided) => ({
+    ...provided,
+    color: "#fff",
+    fontWeight: 500,
+  }),
+  multiValueRemove: (provided) => ({
+    ...provided,
+    color: "#111827",
+    ":hover": {
+      backgroundColor: "transparent", // 배경 없앰
+      color: "#111827", // 검은색
+    },
+  }),
+};
 
 const seasonOptions = [
   { label: "겨울 (1분기)", value: "WINTER" },
@@ -28,14 +85,14 @@ const getCurrentSeason = () => {
 const GenreSection = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-
   const [selectedGenres, setSelectedGenres] = useState(searchParams.get("genres")?.split(",") || []);
   const [selectedSeason, setSelectedSeason] = useState(searchParams.get("season") || getCurrentSeason());
   const [selectedYear, setSelectedYear] = useState(Number(searchParams.get("year")) || currentYear);
-
+  const [selectedName, setSelectedName] = useState(searchParams.get("name") ?? "");
   const [animeList, setAnimeList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedName, setDebouncedName] = useState(null);
   const itemsPerPage = 12;
 
   useEffect(() => {
@@ -63,64 +120,85 @@ const GenreSection = () => {
     if (selectedGenres.length) params.genres = selectedGenres.join(",");
     params.season = selectedSeason;
     params.year = selectedYear;
+    params.name = selectedName;
     setSearchParams(params);
-  }, [selectedGenres, selectedSeason, selectedYear, setSearchParams]);
+  }, [selectedGenres, selectedSeason, selectedYear, debouncedName]);
 
   /* ---------- 필터 ---------- */
   const filteredList = useMemo(() => {
-    if (!selectedGenres.length) return animeList;
-    return animeList.filter((a) => a.genres.some((g) => selectedGenres.includes(g)));
-  }, [animeList, selectedGenres]);
+    return animeList.filter((a) => {
+      const matchesGenre = !selectedGenres.length || a.genres.some((g) => selectedGenres.includes(g));
+      const matchesName = !debouncedName || a.title.toLowerCase().includes(debouncedName.toLowerCase());
+      return matchesGenre && matchesName;
+    });
+  }, [animeList, selectedGenres, debouncedName]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedName(selectedName);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [selectedName]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedName, selectedGenres]);
 
   const currentItems = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const toggleGenre = (genre) => {
-    setCurrentPage(1);
-    setSelectedGenres((prev) => (prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]));
-  };
 
   return (
     <div className="container mx-auto px-4 py-20">
       <h1 className="text-3xl font-bold mb-6">장르 · 분기별 작품</h1>
 
-      <div className="flex gap-4 mb-6 flex-wrap">
-        <select
-          value={selectedSeason}
-          onChange={(e) => setSelectedSeason(e.target.value)}
-          className="px-4 py-2 rounded-lg bg-gray-200"
-        >
-          {seasonOptions.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+      <div className="flex gap-4 mb-6 flex-wrap justify-between">
+        <div className="flex gap-4">
+          <select
+            value={selectedSeason}
+            onChange={(e) => setSelectedSeason(e.target.value)}
+            className="px-4 py-2 rounded-2xl bg-white border border-gray-400 hover:cursor-pointer"
+          >
+            {seasonOptions.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
 
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className="px-4 py-2 rounded-lg bg-gray-200"
-        >
-          {yearOptions.map((y) => (
-            <option key={y} value={y}>
-              {y}년
-            </option>
-          ))}
-        </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="px-4 py-2 rounded-2xl bg-white border border-gray-400 hover:cursor-pointer"
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}년
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <input
+          className="px-4 py-2 rounded-2xl w-80 bg-white border border-gray-400 hover:cursor-pointer"
+          placeholder="Search"
+          value={selectedName}
+          onChange={(e) => setSelectedName(e.target.value)}
+        ></input>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-10">
-        {genresList.map((g) => (
-          <button
-            key={g}
-            onClick={() => toggleGenre(g)}
-            className={`px-4 py-2 rounded-full ${
-              selectedGenres.includes(g) ? "bg-red-600 text-white" : "bg-gray-200 hover:bg-gray-300"
-            }`}
-          >
-            {g}
-          </button>
-        ))}
+        <Select
+          isMulti
+          options={genreOptions}
+          value={genreOptions.filter((option) => selectedGenres.includes(option.value))}
+          placeholder="장르선택"
+          onChange={(selectedOptions) => {
+            const selected = selectedOptions ? selectedOptions.map((option) => option.value) : [];
+            setSelectedGenres(selected);
+            setCurrentPage(1);
+          }}
+          styles={customStyles}
+        />
       </div>
 
       {isLoading && (

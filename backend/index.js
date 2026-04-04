@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import service from "./routes/service.js";
 import user from "./routes/user.js";
 import post from "./routes/post.js";
+import "./jobs/syncAnime.js";
 
 dotenv.config();
 

@@ -1,6 +1,5 @@
-// env 변수
-const GOOGLE_KEY = process.env.GOOGLETRANSLATION;
 import "dotenv/config";
+const GOOGLE_KEY = process.env.GOOGLETRANSLATION;
 
 // ESM용 import
 import fetch from "node-fetch";
@@ -41,11 +40,19 @@ export async function translate(text, source, target) {
   };
   if (source && source !== "auto") bodyPayload.source = source;
 
-  const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_KEY}`, {
+  const response = await fetch("https://api.langbly.com/language/translate/v2", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": GOOGLE_KEY,
+    },
     body: JSON.stringify(bodyPayload),
   });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`API 오류 ${response.status}: ${errorBody}`);
+  }
 
   const data = await response.json();
 

@@ -10,15 +10,15 @@ const MainPage = () => {
   useEffect(() => {
     const fetchAnime = async () => {
       try {
-        const [trending, Completed, ovaAni] = await Promise.all([
+        const [trending, completed, ovaAni] = await Promise.all([
           fetchAniList("trending"),
           fetchAniList("completed"),
           fetchAniList("ova"),
         ]);
 
-        setTrendingAnime(trending);
-        setCompletedAnime(Completed);
-        setOvaAnime(ovaAni);
+        setTrendingAnime(trending || []);
+        setCompletedAnime(completed || []);
+        setOvaAnime(ovaAni || []);
       } catch (err) {
         console.error(err);
       }
@@ -30,7 +30,7 @@ const MainPage = () => {
   return (
     <div>
       <MainPageCard title="추천 애니" animeList={trendingAnime} />
-      <MainPageCard title="종영" animeList={completedAnime} />
+      <MainPageCard title="완결 애니" animeList={completedAnime} />
       <MainPageCard title="OVA / 극장판" animeList={ovaAnime} />
     </div>
   );

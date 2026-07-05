@@ -7,7 +7,8 @@ const anime = new mongoose.Schema({
     type: String,
     enum: ["TV", "TV_SHORT", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC"],
   },
-  title: {
+  title: String,
+  originalTitle: {
     romaji: String,
     english: String,
     native: String,
@@ -55,7 +56,7 @@ const anime = new mongoose.Schema({
   ],
   contentTypes: {
     type: [String], // 배열
-    enum: ["trending", "completed", "upcoming", "ova", "genre"], // enum 제한
+    enum: ["trending", "completed", "upcoming", "ova", "genre", "airing", "detail"], // enum 제한
     default: [],
   }, //요청형식
   updatedAt: Number, // AniList에서 마지막 갱신 timestamp

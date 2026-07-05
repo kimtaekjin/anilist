@@ -4,14 +4,38 @@ export const queries = {
     Page(perPage: 50) {
       media(type: ANIME, format: TV, sort: POPULARITY_DESC) {
         id
-        title { native }
-        coverImage { large }
+        title {
+          romaji
+          english
+          native
+        }
+        coverImage {
+          large
+          extraLarge
+        }
+        bannerImage
+        genres
+        startDate {
+          year
+          month
+          day
+        }
+        season
+        seasonYear
+        studios(isMain: true) {
+          nodes {
+            name
+          }
+        }
         format
         status
         averageScore
         popularity
         episodes
-        nextAiringEpisode { episode }
+        nextAiringEpisode {
+          episode
+          airingAt
+        }
       }
     }
   }
@@ -22,8 +46,29 @@ export const queries = {
       Page(perPage: 50) {
         media(type: ANIME, format: TV, sort: TRENDING_DESC, status: FINISHED) {
           id
-          title { native }
-          coverImage { large }
+          title {
+            romaji
+            english
+            native
+          }
+          coverImage {
+            large
+            extraLarge
+          }
+          bannerImage
+          genres
+          startDate {
+            year
+            month
+            day
+          }
+          season
+          seasonYear
+          studios(isMain: true) {
+            nodes {
+              name
+            }
+          }
           format
           status
           averageScore
@@ -38,8 +83,29 @@ export const queries = {
       Page(perPage: 50) {
         media(type: ANIME, format_in: [OVA, MOVIE],status:FINISHED ,sort: POPULARITY_DESC) {
           id
-          title { native }
-          coverImage { large }
+          title {
+            romaji
+            english
+            native
+          }
+          coverImage {
+            large
+            extraLarge
+          }
+          bannerImage
+          genres
+          startDate {
+            year
+            month
+            day
+          }
+          season
+          seasonYear
+          studios(isMain: true) {
+            nodes {
+              name
+            }
+          }
           format
           status
           averageScore
@@ -121,8 +187,22 @@ export const queries = {
           seasonYear: $year
         ) {
           id
-          title { native }
-          coverImage { large }
+          title {
+            romaji
+            english
+            native
+          }
+          coverImage {
+            large
+            extraLarge
+          }
+          bannerImage
+          genres
+          startDate {
+            year
+            month
+            day
+          }
           episodes
           season
           studios(isMain: true) {
@@ -132,6 +212,9 @@ export const queries = {
           }
           seasonYear
           status
+          format
+          averageScore
+          popularity
         nextAiringEpisode {
           episode
           airingAt
@@ -175,7 +258,7 @@ export const queries = {
       }
     }
   `,
-  upcomming: `
+  upcoming: `
         query ( $page: Int) {
             Page(perPage: 50, page: $page) {
               pageInfo {
@@ -195,8 +278,14 @@ export const queries = {
                 }
                 coverImage {
                   large
+                  extraLarge
                 }
+                bannerImage
                 genres
+                format
+                status
+                averageScore
+                popularity
                 startDate {
                   year
                   month

@@ -21,10 +21,10 @@ const Upcoming = () => {
       setIsLoading(true);
       setCurrentPage(1);
       try {
-        const data = await fetchAniList("upcomming");
+        const data = await fetchAniList("upcoming");
         console.log(data);
 
-        setAnimeList(data);
+        setAnimeList(data || []);
       } catch (err) {
         console.error(err);
       } finally {

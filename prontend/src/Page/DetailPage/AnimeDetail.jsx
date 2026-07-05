@@ -14,8 +14,6 @@ const AnimeDetail = () => {
     const fetchAnime = async () => {
       try {
         const translatedData = await fetchDetailAnime("detail", id);
-        // console.log(translatedData);
-
         setAnime(translatedData);
       } catch (err) {
         console.error("AniList fetch error:", err);
@@ -33,24 +31,21 @@ const AnimeDetail = () => {
     return <p className="text-center py-20">데이터를 불러올 수 없습니다.</p>;
   }
 
-  // 현재 방영 화수
   const currentEpisode =
-    anime.status === "RELEASING" && anime.nextAiringEpisode ? anime.nextAiringEpisode.episode - 1 : anime.episodes;
+    anime.status === "RELEASING" && anime.nextAiringEpisode ? anime.nextAiringEpisode.episode : anime.episodes;
 
   return (
     <div className="container mx-auto px-4 py-10">
-      {/* 배너 */}
       {anime?.image?.banner && (
         <img
           src={anime.image.banner}
-          alt={anime?.title?.native || anime?.title?.romaji}
+          alt={anime?.title || anime?.originalTitle?.native || anime?.originalTitle?.romaji || ""}
           className="w-full h-72 object-cover rounded-2xl mb-6"
         />
       )}
 
-      {/* 상단 정보 */}
       <div className="flex flex-col md:flex-row gap-6 mb-6">
-        <img src={anime?.image?.large} alt={anime?.title} className="w-56 rounded-xl shadow-lg" />
+        <img src={anime?.image?.large} alt={anime?.title || ""} className="w-56 rounded-xl shadow-lg" />
 
         <div className="flex-1">
           <h1 className="text-2xl font-bold mb-2">{anime?.title || ""}</h1>
@@ -72,14 +67,13 @@ const AnimeDetail = () => {
 
           <div className="flex items-center gap-1">
             <Building size={14} className="text-gray-400" />
-            {anime?.studio || "미정"}
+            {Array.isArray(anime?.studio) ? anime.studio.join(", ") : anime?.studio || "미정"}
           </div>
 
           <div className="flex items-center gap-2 mx-4 my-2">
             <StarRating score={anime?.averageScore} size={18} showText />
           </div>
 
-          {/* 장르 */}
           <div className="flex flex-wrap gap-2 mb-4">
             {anime?.genres?.map((genre) => (
               <span key={genre} className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm">
@@ -90,13 +84,11 @@ const AnimeDetail = () => {
         </div>
       </div>
 
-      {/* 줄거리 */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold mb-2">줄거리</h2>
         <p className="leading-relaxed text-gray-700" dangerouslySetInnerHTML={{ __html: anime?.description }} />
       </div>
 
-      {/* 트레일러 */}
       {anime?.trailer?.site === "youtube" && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2">트레일러</h2>
@@ -109,7 +101,6 @@ const AnimeDetail = () => {
         </div>
       )}
 
-      {/* 캐릭터 */}
       <div>
         <h2 className="text-2xl font-bold mb-4">캐릭터</h2>
 
@@ -121,7 +112,7 @@ const AnimeDetail = () => {
                 alt={character?.name?.full}
                 className="w-full h-40 object-cover rounded-lg mb-1"
               />
-              <p className="text-sm">{character?.name?.native}</p>
+              <p className="text-sm">{character?.name?.native || character?.name?.full}</p>
             </div>
           ))}
         </div>

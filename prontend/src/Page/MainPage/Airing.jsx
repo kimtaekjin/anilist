@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { AiringSkeleton } from "../../Components/items/Skeleton";
 
-const days = ["전체", "월", "화", "수", "목", "금", "토", "일"];
+const days = ["전체", "일", "월", "화", "수", "목", "금", "토"];
 
 const Airing = () => {
   const [animeList, setAnimeList] = useState([]);
@@ -16,11 +16,10 @@ const Airing = () => {
     const fetchAiring = async () => {
       const now = new Date();
       const year = now.getFullYear();
-      // const month = now.getMonth() + 1;
 
       try {
         const processed = await fetchAniList("airing");
-        const filtered = processed.filter((ani) => ani.seasonYear === year);
+        const filtered = (processed || []).filter((ani) => ani.seasonYear === year);
 
         setAnimeList(filtered);
       } catch (err) {
@@ -29,6 +28,7 @@ const Airing = () => {
         setIsLoading(false);
       }
     };
+
     fetchAiring();
   }, []);
 
@@ -62,15 +62,14 @@ const Airing = () => {
               <div
                 key={anime._id}
                 onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
-                className="bg-white cursor-pointer rounded-2xl shadow-lg overflow-hidden
-                hover:shadow-2xl transition"
+                className="bg-white cursor-pointer rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition"
               >
                 <img src={anime.image.large} alt={anime.title} className="w-full h-48 object-cover" />
                 <div className="p-4">
                   <h3 className="font-bold text-base line-clamp-2 h-12">{anime.title}</h3>
                   <div className="flex justify-between text-sm text-gray-400 mt-1">
-                    <span>{anime.days}요일</span>
-                    <span>{anime.episodes}화</span>
+                    <span>{anime.days ? `${anime.days}요일` : "방영일 미정"}</span>
+                    <span>{anime.episodes ? `${anime.episodes}화` : ""}</span>
                   </div>
                 </div>
               </div>

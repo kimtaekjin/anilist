@@ -120,9 +120,9 @@ const GenreSection = () => {
     if (selectedGenres.length) params.genres = selectedGenres.join(",");
     params.season = selectedSeason;
     params.year = selectedYear;
-    params.name = selectedName;
+    if (debouncedName) params.name = debouncedName;
     setSearchParams(params);
-  }, [selectedGenres, selectedSeason, selectedYear, debouncedName]);
+  }, [selectedGenres, selectedSeason, selectedYear, debouncedName, setSearchParams]);
 
   /* ---------- 필터 ---------- */
   const filteredList = useMemo(() => {

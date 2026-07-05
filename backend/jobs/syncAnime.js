@@ -24,8 +24,8 @@ async function syncAll() {
       await sleep(TYPE_DELAY);
     } catch (err) {
       console.error(`[${type}] 동기화 실패:`, err);
-      if (err.status === 429 || err.status >= 500) {
-        console.error("Jikan 호출 제한 또는 임시 장애로 이번 동기화 사이클을 중단합니다.");
+      if (err.status === 429 || err.status === 403 || err.status >= 500) {
+        console.error("AniList 호출 제한 또는 임시 장애로 이번 동기화 사이클을 중단합니다.");
         break;
       }
       await sleep(TYPE_DELAY);

@@ -1,7 +1,6 @@
 import express from "express";
+import { traslateItem } from "../components/translateItem.js";
 import { queries } from "../components/animeQuery.js";
-import { fetchAnime } from "../components/fetchAnime.js";
-import { fetchJikanDetail } from "../components/jikanAdapter.js";
 import redis from "../config/redis.js";
 import Anime from "../models/anime.js";
 
@@ -9,12 +8,98 @@ const router = express.Router();
 
 router.use(express.json());
 
+const ANILIST_ENDPOINT = "https://graphql.anilist.co";
+
 function normalizeAnimeType(type) {
   return type === "upcomming" ? "upcoming" : type;
 }
 
-async function fetchDetail(_query, type, id) {
-  const result = await fetchJikanDetail(id);
+async function fetchDetail(query, type, id) {
+  const response = await fetch(ANILIST_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      variables: { id: Number(id) },
+    }),
+  });
+
+  const res = await response.json();
+
+  if (res.errors?.length) {
+    const firstError = res.errors[0];
+    const error = new Error(firstError.message || "AniList API error");
+    error.status = firstError.status || response.status;
+    throw error;
+  }
+
+  const data = res?.data?.Media;
+
+  if (!data) {
+    throw new Error("AniList 데이터 없음");
+  }
+
+  const cleanDescription = data.description ? data.description.replace(/<[^>]*>/g, "").trim() : "";
+  const titleText = data.title?.native || data.title?.romaji || data.title?.english || "";
+
+  const [translatedTitle, translatedDescription, translatedGenres] = await Promise.all([
+    titleText ? traslateItem(titleText) : "",
+    cleanDescription ? traslateItem(cleanDescription) : "줄거리 정보 없음",
+    data.genres ? Promise.all(data.genres.map((genre) => traslateItem(genre).catch(() => genre))) : [],
+  ]);
+
+  const characters = data.characters?.edges
+    ? await Promise.all(
+        data.characters.edges.map(async (edge) => ({
+          role: edge.role,
+          name: {
+            full: edge.node.name.full,
+            native: edge.node.name.native ? await traslateItem(edge.node.name.native).catch(() => edge.node.name.native) : null,
+          },
+          image: {
+            large: edge.node.image?.large || null,
+          },
+        })),
+      )
+    : [];
+
+  const result = {
+    _id: data.id,
+    idMal: data.idMal || null,
+    title: translatedTitle,
+    originalTitle: {
+      romaji: data.title?.romaji || "",
+      english: data.title?.english || "",
+      native: data.title?.native || "",
+    },
+    description: translatedDescription,
+    genres: translatedGenres,
+    episodes: data.status === "NOT_YET_RELEASED" ? null : data.episodes || null,
+    status: data.status || "",
+    averageScore: data.averageScore || 0,
+    popularity: data.popularity || 0,
+    season: data.season || "",
+    seasonYear: data.seasonYear || null,
+    startDate: {
+      year: data.startDate?.year || null,
+      month: data.startDate?.month || null,
+      day: data.startDate?.day || null,
+    },
+    image: {
+      large: data.coverImage?.large || "",
+      extraLarge: data.coverImage?.extraLarge || "",
+      banner: data.bannerImage || "",
+    },
+    bannerImage: data.bannerImage || "",
+    studio: data.studios?.edges?.map((edge) => edge.node.name).filter(Boolean) || ["미정"],
+    trailer: data.trailer || null,
+    characters,
+    nextAiringEpisode: data.nextAiringEpisode || null,
+    lastSyncedAt: new Date(),
+  };
 
   await Anime.updateOne(
     { _id: result._id },
@@ -48,8 +133,8 @@ router.get("/anime/detail/:id", async (req, res) => {
       try {
         media = await fetchDetail(queries[type], type, animeId);
       } catch (error) {
-        if (media && (error.status === 429 || error.status >= 500)) {
-          console.error("Jikan API unavailable, returning stale detail data:", error);
+        if (media && (error.status === 429 || error.status >= 500 || error.status === 403)) {
+          console.error("AniList API unavailable, returning stale detail data:", error);
           return res.status(200).json(media);
         }
 
@@ -66,7 +151,6 @@ router.get("/anime/detail/:id", async (req, res) => {
 
 router.get("/anime/:type", async (req, res) => {
   const type = normalizeAnimeType(req.params.type);
-
   const cacheKey = `anime:${type}`;
 
   try {

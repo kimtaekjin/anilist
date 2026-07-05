@@ -1,73 +1,29 @@
+import { traslateItem } from "../components/translateItem.js";
 import Anime from "../models/anime.js";
-import { fetchJikanJson, getJikanListUrls, normalizeJikanAnime } from "./jikanAdapter.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const ANILIST_ENDPOINT = "https://graphql.anilist.co";
+
+const MAX_CONCURRENT_TRANSLATIONS = 10;
 const MAX_CONCURRENT_DB_UPDATES = 30;
-const REQUEST_DELAY = 2500;
+const MAX_PAGE_CONCURRENCY = 3;
+const REQUEST_DELAY = 1000;
 const SINGLE_BATCH_TYPES = ["trending", "completed", "ova"];
-const MAX_PAGES = 1;
+const STOP_SYNC_STATUSES = [401, 403];
 
-export async function fetchAnime(_query, type, body = {}) {
-  const now = new Date();
-  const year = body.year || now.getFullYear();
-  const month = now.getMonth() + 1;
-  const defaultSeason = month <= 3 ? "WINTER" : month <= 6 ? "SPRING" : month <= 9 ? "SUMMER" : "FALL";
-  const season = (body.season || defaultSeason).toUpperCase();
-
-  let page = 1;
-  let hasNextPage = true;
-  const allMedia = [];
-
-  while (hasNextPage && page <= MAX_PAGES) {
-    const urls = getJikanListUrls(type, page, { season, year });
-    const results = [];
-
-    for (const url of urls) {
-      const json = await fetchJikanJson(url);
-      results.push(json);
-      await sleep(REQUEST_DELAY);
-    }
-
-    for (const result of results) {
-      if (Array.isArray(result.data)) {
-        allMedia.push(...result.data);
-      }
-    }
-
-    if (SINGLE_BATCH_TYPES.includes(type)) {
-      break;
-    }
-
-    hasNextPage = results.some((result) => result.pagination?.has_next_page);
-    page += 1;
+class AniListRequestError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "AniListRequestError";
+    this.status = status;
   }
+}
 
-  const uniqueMedia = Array.from(new Map(allMedia.map((anime) => [anime.mal_id, anime])).values());
-
-  const filteredMedia = uniqueMedia.filter((anime) => {
-    if (type === "trending") return (anime.score || 0) >= 7 && (anime.members || 0) >= 80000;
-    return true;
-  });
-
-  const media = [];
-  for (const anime of filteredMedia) {
-    media.push(await normalizeJikanAnime(anime));
-  }
-
-  await limitConcurrency(media, MAX_CONCURRENT_DB_UPDATES, async (anime) => {
-    try {
-      return await Anime.updateOne(
-        { _id: anime._id },
-        { $set: anime, $addToSet: { contentTypes: type } },
-        { upsert: true, runValidators: true },
-      );
-    } catch (error) {
-      console.error(`DB update failed for anime _id: ${anime._id}`, error);
-    }
-  });
-
-  return media;
+function getDay(airingAt) {
+  const date = new Date(airingAt * 1000);
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  return days[date.getDay()];
 }
 
 async function limitConcurrency(items, limit, asyncFn) {
@@ -83,4 +39,173 @@ async function limitConcurrency(items, limit, asyncFn) {
 
   await Promise.all(workers);
   return results;
+}
+
+export async function fetchAnime(query, type, body = {}) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const defaultSeason = month <= 3 ? "WINTER" : month <= 6 ? "SPRING" : month <= 9 ? "SUMMER" : "FALL";
+
+  let page = 1;
+  let hasNextPage = true;
+  const allMedia = [];
+
+  const variables = {
+    season: (body.season || defaultSeason).toUpperCase(),
+    year: body.year || year,
+  };
+
+  async function fetchPage(pageNumber, retryCount = 0) {
+    try {
+      const response = await fetch(ANILIST_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          variables: { ...variables, page: pageNumber },
+        }),
+      });
+
+      const json = await response.json();
+      const firstError = json.errors?.[0];
+      const errorStatus = firstError?.status || response.status;
+
+      if (json.errors?.length) {
+        const message = firstError?.message || "AniList GraphQL error";
+
+        if (errorStatus === 429 && retryCount < 5) {
+          const delay = 3000 * (retryCount + 1);
+          console.log(`Rate limited, retrying page ${pageNumber} after ${delay}ms...`);
+          await sleep(delay);
+          return fetchPage(pageNumber, retryCount + 1);
+        }
+
+        if (STOP_SYNC_STATUSES.includes(errorStatus)) {
+          throw new AniListRequestError(message, errorStatus);
+        }
+
+        console.error("AniList response error:", json);
+        return null;
+      }
+
+      const pageData = json.data?.Page;
+
+      if (!pageData) {
+        console.error("AniList response error:", json);
+        return null;
+      }
+
+      console.log(`[${type}] page: ${pageNumber}, hasNextPage: ${pageData.pageInfo?.hasNextPage}`);
+      return pageData;
+    } catch (error) {
+      if (error instanceof AniListRequestError) {
+        throw error;
+      }
+
+      console.error("fetch error", error);
+      return null;
+    }
+  }
+
+  while (hasNextPage) {
+    const pageCount = SINGLE_BATCH_TYPES.includes(type) ? 1 : MAX_PAGE_CONCURRENCY;
+    const pages = [];
+
+    for (let i = 0; i < pageCount; i++) {
+      pages.push(page++);
+    }
+
+    const results = await Promise.all(pages.map(fetchPage));
+
+    for (const pageData of results) {
+      if (pageData?.media) allMedia.push(...pageData.media);
+    }
+
+    if (SINGLE_BATCH_TYPES.includes(type)) {
+      break;
+    }
+
+    const lastValidResult = [...results].reverse().find(Boolean);
+    hasNextPage = lastValidResult?.pageInfo?.hasNextPage ?? false;
+
+    await sleep(REQUEST_DELAY);
+  }
+
+  const uniqueMedia = Array.from(new Map(allMedia.map((anime) => [anime.id, anime])).values());
+
+  const filteredMedia = uniqueMedia.filter((anime) => {
+    if (type === "trending") return anime.averageScore >= 70 && anime.popularity >= 80000;
+    return true;
+  });
+
+  async function processAnime(anime) {
+    const airingAt = anime.nextAiringEpisode?.airingAt;
+    const currentEpisode =
+      anime.nextAiringEpisode?.episode !== undefined ? anime.nextAiringEpisode.episode - 1 : anime.episodes || null;
+
+    const genres = anime.genres
+      ? await limitConcurrency(anime.genres, MAX_CONCURRENT_TRANSLATIONS, (genre) =>
+          traslateItem(genre).catch(() => genre),
+        )
+      : [];
+
+    const title = anime.title?.native
+      ? await traslateItem(anime.title.native).catch(() => anime.title?.romaji || "")
+      : anime.title?.romaji || "";
+
+    return {
+      _id: anime.id,
+      idMal: anime.idMal || null,
+      title,
+      originalTitle: {
+        romaji: anime.title?.romaji || "",
+        english: anime.title?.english || "",
+        native: anime.title?.native || "",
+      },
+      image: {
+        large: anime.coverImage?.large || "",
+        extraLarge: anime.coverImage?.extraLarge || "",
+        banner: anime.bannerImage || "",
+      },
+      bannerImage: anime.bannerImage || "",
+      status: anime.status || "",
+      genres,
+      episodes: currentEpisode || 0,
+      type: anime.format || undefined,
+      seasonYear: anime.seasonYear || null,
+      season: anime.season || "",
+      startDate: {
+        year: anime.startDate?.year || null,
+        month: anime.startDate?.month || null,
+        day: anime.startDate?.day || null,
+      },
+      studio: anime.studios?.nodes?.map((s) => s.name).filter(Boolean) || ["미정"],
+      days: airingAt ? getDay(airingAt) : "",
+      averageScore: anime.averageScore || 0,
+      popularity: anime.popularity || 0,
+      nextAiringEpisode: anime.nextAiringEpisode ? { episode: currentEpisode, airingAt } : null,
+      updatedAt: anime.updatedAt || null,
+      lastSyncedAt: new Date(),
+    };
+  }
+
+  const media = await limitConcurrency(filteredMedia, MAX_CONCURRENT_TRANSLATIONS, processAnime);
+
+  await limitConcurrency(media, MAX_CONCURRENT_DB_UPDATES, async (anime) => {
+    try {
+      return await Anime.updateOne(
+        { _id: anime._id },
+        { $set: anime, $addToSet: { contentTypes: type } },
+        { upsert: true, runValidators: true },
+      );
+    } catch (error) {
+      console.error(`DB update failed for anime _id: ${anime._id}`, error);
+    }
+  });
+
+  return media;
 }

@@ -23,6 +23,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "sync:anime": "node jobs/runAnimeSync.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

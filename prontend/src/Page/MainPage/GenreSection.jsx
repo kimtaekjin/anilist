@@ -6,7 +6,7 @@ import Pagination from "../../Components/Pagination/Pagination";
 import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { GenreSkeleton } from "../../Components/items/Skeleton";
 
-const genresList = ["액션", "로맨스", "판타지", "SF", "일상", "스포츠", "모험"];
+const genresList = ["액션", "로맨스", "판타지", "SF", "일상", "스포츠", "모험", "코미디", "드라마", "미스터리"];
 const genreOptions = genresList.map((genre) => ({ value: genre, label: genre }));
 
 const seasonOptions = [
@@ -89,22 +89,16 @@ const selectStyles = {
       color: "#fff",
     },
   }),
-  indicatorSeparator: () => ({
-    display: "none",
-  }),
+  indicatorSeparator: () => ({ display: "none" }),
   dropdownIndicator: (base) => ({
     ...base,
     color: "rgba(245, 241, 232, 0.65)",
-    ":hover": {
-      color: "#f59e0b",
-    },
+    ":hover": { color: "#f59e0b" },
   }),
   clearIndicator: (base) => ({
     ...base,
     color: "rgba(245, 241, 232, 0.58)",
-    ":hover": {
-      color: "#f59e0b",
-    },
+    ":hover": { color: "#f59e0b" },
   }),
 };
 
@@ -280,7 +274,7 @@ const GenreSection = () => {
               >
                 <div className="overflow-hidden">
                   <img
-                    src={anime.image.large}
+                    src={anime.image?.large}
                     alt={anime.title}
                     className="h-52 w-full object-cover transition duration-500 group-hover:scale-105"
                   />

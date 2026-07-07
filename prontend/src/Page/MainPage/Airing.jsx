@@ -6,25 +6,8 @@ import { AiringSkeleton } from "../../Components/items/Skeleton";
 
 const days = ["전체", "일", "월", "화", "수", "목", "금", "토"];
 
-const brokenDayMap = {
-  "ÀÏ": "일",
-  "¿ù": "월",
-  "È­": "화",
-  "¼ö": "수",
-  "¸ñ": "목",
-  "±Ý": "금",
-  "Åä": "토",
-  "?횕": "일",
-  "쩔첫": "월",
-  "횊짯": "화",
-  "쩌철": "수",
-  "쨍챰": "목",
-  "짹횦": "금",
-  "횇채": "토",
-};
-
 function normalizeDay(day) {
-  return brokenDayMap[day] || day || "";
+  return days.includes(day) ? day : "";
 }
 
 const Airing = () => {
@@ -96,7 +79,7 @@ const Airing = () => {
                 >
                   <div className="overflow-hidden">
                     <img
-                      src={anime.image.large}
+                      src={anime.image?.large}
                       alt={anime.title}
                       className="h-48 w-full object-cover transition duration-500 group-hover:scale-105"
                     />

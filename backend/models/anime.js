@@ -1,70 +1,100 @@
 import mongoose from "mongoose";
 
-const anime = new mongoose.Schema({
-  _id: Number, // AniList ID (Primary Key 역할)
-  idMal: Number, // MyAnimeList ID
-  type: {
-    type: String,
-    enum: ["TV", "TV_SHORT", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC"],
+const CONTENT_TYPES = ["trending", "completed", "upcoming", "ova", "genre", "airing", "detail"];
+const MEDIA_TYPES = ["TV", "TV_SHORT", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC"];
+
+const titleSchema = new mongoose.Schema(
+  {
+    romaji: { type: String, default: "" },
+    english: { type: String, default: "" },
+    native: { type: String, default: "" },
   },
-  title: String,
-  originalTitle: {
-    romaji: String,
-    english: String,
-    native: String,
-  },
-  description: String,
-  image: {
+  { _id: false },
+);
+
+const imageSchema = new mongoose.Schema(
+  {
     large: { type: String, default: "" },
     extraLarge: { type: String, default: "" },
     banner: { type: String, default: "" },
   },
-  bannerImage: String,
-  genres: [String],
-  days: String,
-  startDate: {
-    year: Number,
-    month: Number,
-    day: Number,
-  },
-  season: String, // Winter, Spring 등
-  seasonYear: Number,
-  episodes: Number,
-  status: String, // FINISHED, RELEASING 등
-  averageScore: Number,
-  popularity: Number,
-  studio: [String],
-  trailer: {
-    id: String,
-    site: String,
-  },
-  nextAiringEpisode: {
-    episode: Number,
-    airingAt: Number,
-  },
-  characters: [
-    {
-      role: String,
-      name: {
-        full: String,
-        native: String,
-      },
-      image: {
-        large: String,
-      },
-    },
-  ],
-  contentTypes: {
-    type: [String], // 배열
-    enum: ["trending", "completed", "upcoming", "ova", "genre", "airing", "detail"], // enum 제한
-    default: [],
-  }, //요청형식
-  updatedAt: Number, // AniList에서 마지막 갱신 timestamp
-  lastSyncedAt: Date, // 우리 서버에서 마지막 동기화 시간
-  createdAt: Date,
-  modifiedAt: Date,
-});
+  { _id: false },
+);
 
-const Anime = mongoose.model("Anime", anime);
+const dateSchema = new mongoose.Schema(
+  {
+    year: { type: Number, default: null },
+    month: { type: Number, default: null },
+    day: { type: Number, default: null },
+  },
+  { _id: false },
+);
+
+const animeSchema = new mongoose.Schema(
+  {
+    _id: { type: Number, required: true },
+    idMal: { type: Number, default: null, index: true },
+    type: {
+      type: String,
+      enum: MEDIA_TYPES,
+    },
+    title: { type: String, default: "", trim: true },
+    originalTitle: { type: titleSchema, default: () => ({}) },
+    description: { type: String, default: "" },
+    image: { type: imageSchema, default: () => ({}) },
+    bannerImage: { type: String, default: "" },
+    genres: { type: [String], default: [] },
+    days: { type: String, default: "" },
+    startDate: { type: dateSchema, default: () => ({}) },
+    season: { type: String, default: "", index: true },
+    seasonYear: { type: Number, default: null, index: true },
+    episodes: { type: Number, default: 0 },
+    status: { type: String, default: "", index: true },
+    averageScore: { type: Number, default: 0, index: true },
+    popularity: { type: Number, default: 0, index: true },
+    studio: { type: [String], default: ["미정"] },
+    trailer: {
+      id: { type: String, default: "" },
+      site: { type: String, default: "" },
+    },
+    nextAiringEpisode: {
+      episode: { type: Number, default: null },
+      airingAt: { type: Number, default: null },
+    },
+    characters: [
+      {
+        role: String,
+        name: {
+          full: String,
+          native: String,
+        },
+        image: {
+          large: String,
+        },
+      },
+    ],
+    contentTypes: {
+      type: [
+        {
+          type: String,
+          enum: CONTENT_TYPES,
+        },
+      ],
+      default: [],
+      index: true,
+    },
+    updatedAt: { type: Number, default: null },
+    lastSyncedAt: { type: Date, default: null, index: true },
+  },
+  {
+    timestamps: { createdAt: "createdAt", updatedAt: "modifiedAt" },
+  },
+);
+
+animeSchema.index({ contentTypes: 1, popularity: -1, averageScore: -1 });
+animeSchema.index({ contentTypes: 1, averageScore: -1, popularity: -1 });
+animeSchema.index({ contentTypes: 1, season: 1, seasonYear: 1, popularity: -1 });
+
+const Anime = mongoose.model("Anime", animeSchema);
 
 export default Anime;

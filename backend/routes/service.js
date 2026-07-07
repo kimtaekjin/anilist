@@ -336,7 +336,10 @@ router.get("/anime/:type", async (req, res) => {
     if (cached) {
       const cachedData = readResponseCachePayload(cached);
       const filteredCachedData = Array.isArray(cachedData) ? filterExcludedAnime(cachedData, excludedIds) : null;
-      if (Array.isArray(filteredCachedData) && filteredCachedData.length >= MIN_LIST_ITEMS) {
+      if (
+        Array.isArray(filteredCachedData) &&
+        (filteredCachedData.length >= MIN_LIST_ITEMS || (excludedIds.length && cachedData.length >= MIN_LIST_ITEMS))
+      ) {
         console.log(`Redis HIT ${cacheKey}`);
         return res.json(filteredCachedData);
       }
@@ -345,7 +348,11 @@ router.get("/anime/:type", async (req, res) => {
       const filteredLegacyCachedData = Array.isArray(legacyCachedData)
         ? filterExcludedAnime(legacyCachedData, excludedIds)
         : null;
-      if (Array.isArray(filteredLegacyCachedData) && filteredLegacyCachedData.length >= MIN_LIST_ITEMS) {
+      if (
+        Array.isArray(filteredLegacyCachedData) &&
+        (filteredLegacyCachedData.length >= MIN_LIST_ITEMS ||
+          (excludedIds.length && legacyCachedData.length >= MIN_LIST_ITEMS))
+      ) {
         console.log(`Redis HIT legacy ${cacheKey}`);
         const localizedLegacyData = await localizeListForResponse(filteredLegacyCachedData);
         if (redis.isOpen) {
@@ -362,8 +369,9 @@ router.get("/anime/:type", async (req, res) => {
 
     let data = await Anime.find(dbFilter).sort(sort).lean();
     let responseData = filterExcludedAnime(data, excludedIds);
+    const shouldFetchMore = data.length < MIN_LIST_ITEMS || (!excludedIds.length && responseData.length < MIN_LIST_ITEMS);
 
-    if (responseData.length < MIN_LIST_ITEMS) {
+    if (shouldFetchMore) {
       try {
         await fetchListWithLock(cacheKey, queries[type], type, normalizedQuery);
         data = await Anime.find(dbFilter).sort(sort).lean();

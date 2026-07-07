@@ -28,7 +28,7 @@ const AnimeDetail = () => {
   if (loading) return <AnimeDetailSkeleton />;
 
   if (!anime) {
-    return <p className="text-center py-20">데이터를 불러올 수 없습니다.</p>;
+    return <p className="py-20 text-center text-stone-300">데이터를 불러올 수 없습니다.</p>;
   }
 
   const currentEpisode =
@@ -40,20 +40,20 @@ const AnimeDetail = () => {
         <img
           src={anime.image.banner}
           alt={anime?.title || anime?.originalTitle?.native || anime?.originalTitle?.romaji || ""}
-          className="w-full h-72 object-cover rounded-2xl mb-6"
+          className="mb-6 h-72 w-full rounded-2xl object-cover"
         />
       )}
 
-      <div className="flex flex-col md:flex-row gap-6 mb-6">
+      <div className="mb-6 flex flex-col gap-6 md:flex-row">
         <img src={anime?.image?.large} alt={anime?.title || ""} className="w-56 rounded-xl shadow-lg" />
 
         <div className="flex-1">
-          <h1 className="text-2xl font-bold mb-2">{anime?.title || ""}</h1>
+          <h1 className="mb-2 text-2xl font-bold text-stone-50">{anime?.title || ""}</h1>
 
-          <p className="text-gray-500 mb-4">
-            {anime?.season} {anime?.seasonYear} ·{" "}
+          <p className="mb-4 text-stone-400">
+            {anime?.season} {anime?.seasonYear} <span className="mx-2 text-stone-600">/</span>
             {anime?.status === "RELEASING" ? (
-              <span className="text-red-500 font-semibold">{currentEpisode}화 방영중</span>
+              <span className="font-semibold text-red-300">{currentEpisode}화 방영중</span>
             ) : (
               <span>
                 {anime?.episodes
@@ -65,18 +65,18 @@ const AnimeDetail = () => {
             )}
           </p>
 
-          <div className="flex items-center gap-1">
-            <Building size={14} className="text-gray-400" />
+          <div className="flex items-center gap-1 text-stone-300">
+            <Building size={14} className="text-stone-500" />
             {Array.isArray(anime?.studio) ? anime.studio.join(", ") : anime?.studio || "미정"}
           </div>
 
-          <div className="flex items-center gap-2 mx-4 my-2">
+          <div className="mx-4 my-2 flex items-center gap-2">
             <StarRating score={anime?.averageScore} size={18} showText />
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="mb-4 flex flex-wrap gap-2">
             {anime?.genres?.map((genre) => (
-              <span key={genre} className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm">
+              <span key={genre} className="rounded-full bg-red-500/15 px-3 py-1 text-sm text-red-200">
                 {genre}
               </span>
             ))}
@@ -85,18 +85,15 @@ const AnimeDetail = () => {
       </div>
 
       <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-2 text-stone-50">줄거리</h2>
-        <p
-          className="leading-relaxed text-stone-100"
-          dangerouslySetInnerHTML={{ __html: anime?.description }}
-        />
+        <h2 className="mb-2 text-2xl font-bold text-stone-50">줄거리</h2>
+        <p className="leading-relaxed text-stone-100" dangerouslySetInnerHTML={{ __html: anime?.description }} />
       </div>
 
       {anime?.trailer?.site === "youtube" && (
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">트레일러</h2>
+          <h2 className="mb-2 text-2xl font-bold text-stone-50">트레일러</h2>
           <iframe
-            className="w-full h-96 rounded-2xl"
+            className="h-96 w-full rounded-2xl"
             src={`https://www.youtube.com/embed/${anime.trailer.id}`}
             title="Trailer"
             allowFullScreen
@@ -105,17 +102,17 @@ const AnimeDetail = () => {
       )}
 
       <div>
-        <h2 className="text-2xl font-bold mb-4">캐릭터</h2>
+        <h2 className="mb-4 text-2xl font-bold text-stone-50">캐릭터</h2>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
           {anime?.characters?.map((character) => (
             <div key={character?.name?.full} className="text-center">
               <img
                 src={character?.image?.large}
                 alt={character?.name?.full}
-                className="w-full h-40 object-cover rounded-lg mb-1"
+                className="mb-1 h-40 w-full rounded-lg object-cover"
               />
-              <p className="text-sm">{character?.name?.native || character?.name?.full}</p>
+              <p className="text-sm text-stone-200">{character?.name?.native || character?.name?.full}</p>
             </div>
           ))}
         </div>

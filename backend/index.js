@@ -41,7 +41,11 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB 연결 성공");
-    startAnimeSync();
+    if (process.env.ANIME_SYNC_ENABLED === "true") {
+      startAnimeSync();
+    } else {
+      console.log("애니 자동 동기화 비활성화: cron/job에서 npm run sync:anime로 실행하세요.");
+    }
   })
   .catch((err) => console.error("MongoDB 연결 실패", err));
 

@@ -13,7 +13,11 @@ export const fetchAniList = async (type, selectedSeason, selectedYear, extraPara
       params: body,
     });
 
-    response.data.map((e) => {
+    const animeList = Array.isArray(response.data) ? response.data : [];
+
+    return animeList.map((anime) => {
+      const e = { ...anime };
+
       if (e.startDate) {
         const year = e.startDate.year ?? "";
         const month = e.startDate.month ? String(e.startDate.month).padStart(2, "0") : "";
@@ -27,9 +31,6 @@ export const fetchAniList = async (type, selectedSeason, selectedYear, extraPara
 
       return e;
     });
-    // console.log("type:", type, "DATA:", response.data);
-
-    return response.data;
   } catch (error) {
     console.error("error:", error);
   }

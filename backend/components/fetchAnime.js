@@ -1,15 +1,19 @@
-import { traslateItem } from "../components/translateItem.js";
+﻿import { localizeGenre } from "../components/animeLocalization.js";
+import { translateItem } from "../components/translateItem.js";
 import Anime from "../models/anime.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
 
-const MAX_CONCURRENT_TRANSLATIONS = 10;
+const MAX_CONCURRENT_TRANSLATIONS = 1;
 const MAX_CONCURRENT_DB_UPDATES = 30;
 const MAX_PAGE_CONCURRENCY = 3;
 const REQUEST_DELAY = 1000;
 const SINGLE_BATCH_TYPES = ["trending", "completed", "ova"];
+const MAX_PAGE_BATCHES_BY_TYPE = {
+  upcoming: Number(process.env.ANIME_UPCOMING_MAX_PAGE_BATCHES || 1),
+};
 const STOP_SYNC_STATUSES = [401, 403];
 
 class AniListRequestError extends Error {
@@ -49,6 +53,7 @@ export async function fetchAnime(query, type, body = {}) {
 
   let page = 1;
   let hasNextPage = true;
+  let pageBatchCount = 0;
   const allMedia = [];
 
   const variables = {
@@ -112,6 +117,8 @@ export async function fetchAnime(query, type, body = {}) {
   }
 
   while (hasNextPage) {
+    pageBatchCount += 1;
+
     const pageCount = SINGLE_BATCH_TYPES.includes(type) ? 1 : MAX_PAGE_CONCURRENCY;
     const pages = [];
 
@@ -126,6 +133,10 @@ export async function fetchAnime(query, type, body = {}) {
     }
 
     if (SINGLE_BATCH_TYPES.includes(type)) {
+      break;
+    }
+
+    if (MAX_PAGE_BATCHES_BY_TYPE[type] && pageBatchCount >= MAX_PAGE_BATCHES_BY_TYPE[type]) {
       break;
     }
 
@@ -148,13 +159,11 @@ export async function fetchAnime(query, type, body = {}) {
       anime.nextAiringEpisode?.episode !== undefined ? anime.nextAiringEpisode.episode - 1 : anime.episodes || null;
 
     const genres = anime.genres
-      ? await limitConcurrency(anime.genres, MAX_CONCURRENT_TRANSLATIONS, (genre) =>
-          traslateItem(genre).catch(() => genre),
-        )
+      ? await limitConcurrency(anime.genres, MAX_CONCURRENT_TRANSLATIONS, localizeGenre)
       : [];
 
     const title = anime.title?.native
-      ? await traslateItem(anime.title.native).catch(() => anime.title?.romaji || "")
+      ? await translateItem(anime.title.native).catch(() => anime.title?.romaji || "")
       : anime.title?.romaji || "";
 
     return {
@@ -209,3 +218,6 @@ export async function fetchAnime(query, type, body = {}) {
 
   return media;
 }
+
+
+

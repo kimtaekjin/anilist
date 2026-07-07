@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Calendar, Building } from "lucide-react";
+import { Building, CalendarDays, Clapperboard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { UpcommingSkeleton } from "../../Components/items/Skeleton";
@@ -20,13 +20,13 @@ const Upcoming = () => {
     const fetchUpcomingAnime = async () => {
       setIsLoading(true);
       setCurrentPage(1);
+
       try {
         const data = await fetchAniList("upcoming");
-        console.log(data);
-
-        setAnimeList(data || []);
+        setAnimeList(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
+        setAnimeList([]);
       } finally {
         setIsLoading(false);
       }
@@ -36,79 +36,97 @@ const Upcoming = () => {
   }, []);
 
   return (
-    <div className="container mx-auto px-4 py-20">
-      <h1 className="text-3xl font-extrabold mb-12 text-center">방영 예정 작품</h1>
+    <section className="mx-auto min-h-screen max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mb-8 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
+          <Clapperboard size={16} />
+          <span>Coming Soon</span>
+        </div>
+        <h1 className="text-3xl font-bold tracking-normal text-stone-50 sm:text-4xl">방영 예정작</h1>
+      </div>
 
-      {/* 로딩 */}
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <UpcommingSkeleton key={i} />
           ))}
         </div>
       )}
 
-      {/* 작품 리스트 */}
-      {!isLoading && animeList.length === 0 && <p className="text-gray-400 text-center">방영 예정 작품이 없습니다.</p>}
-
-      {!isLoading && animeList.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {currentItems.map((anime) => (
-            <div
-              key={anime._id}
-              onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
-              className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition cursor-pointer"
-            >
-              {/* 이미지 */}
-              {anime.image && (
-                <div className="aspect-[4/3] w-full overflow-hidden">
-                  <img src={anime.image.large} alt={anime.title} className="w-full h-full object-cover" />
-                </div>
-              )}
-
-              {/* 정보 */}
-              <div className="p-6">
-                <div className="h-14 mb-1">
-                  <h3 className="text-xl font-bold mb-2 text-gray-800 line-clamp-2">{anime.title}</h3>
-                </div>
-
-                {/* 장르 */}
-                <div className="flex flex-wrap gap-2 h-7 ">
-                  {anime.genres.slice(0, 3).map((g) => (
-                    <span key={g} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                      {g}
-                    </span>
-                  ))}
-                  {anime.genres.length > 3 && (
-                    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                      +{anime.genres.length - 3}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex justify-between items-center text-gray-500 text-sm mt-1 border-t border-gray-200 pt-2">
-                  <div className="flex items-center gap-1">
-                    <Calendar size={14} className="text-gray-400" />
-                    <span>{anime.startDate ? anime.startDate : "미정"}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Building size={14} className="text-gray-400" />
-                    <span>{anime?.studio?.[0] || "미정"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+      {!isLoading && animeList.length === 0 && (
+        <div className="rounded-lg border border-stone-100/10 bg-[#181816]/80 py-16 text-center text-stone-400">
+          방영 예정 작품이 없습니다.
         </div>
       )}
-      <Pagination
-        currentPage={currentPage}
-        totalItems={animeList.length}
-        itemsPerPage={itemsPerPage}
-        onPageChange={setCurrentPage}
-      />
-    </div>
+
+      {!isLoading && animeList.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {currentItems.map((anime) => {
+              const genres = Array.isArray(anime.genres) ? anime.genres : [];
+              const studio = Array.isArray(anime.studio) ? anime.studio[0] : anime.studio;
+
+              return (
+                <button
+                  key={anime._id}
+                  type="button"
+                  onClick={() => navigate(`/AnimeDetail/${anime._id}`)}
+                  className="group overflow-hidden rounded-lg border border-stone-100/10 bg-[#181816] text-left shadow-xl shadow-black/25 transition duration-300 hover:-translate-y-1 hover:border-amber-500/60 hover:shadow-amber-950/30 focus:outline-none focus:ring-4 focus:ring-amber-500/20"
+                >
+                  {anime.image && (
+                    <div className="aspect-[4/3] w-full overflow-hidden">
+                      <img
+                        src={anime.image.large}
+                        alt={anime.title}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    </div>
+                  )}
+
+                  <div className="p-5">
+                    <div className="mb-2 h-14">
+                      <h3 className="line-clamp-2 text-xl font-bold leading-snug text-stone-50">{anime.title}</h3>
+                    </div>
+
+                    <div className="mb-4 flex h-8 flex-wrap gap-2 overflow-hidden">
+                      {genres.slice(0, 3).map((genre) => (
+                        <span key={genre} className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-200">
+                          {genre}
+                        </span>
+                      ))}
+                      {genres.length > 3 && (
+                        <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200">
+                          +{genres.length - 3}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between gap-3 border-t border-stone-100/10 pt-3 text-sm text-stone-400">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <CalendarDays size={14} className="shrink-0 text-cyan-200/80" />
+                        <span className="truncate">{anime.startDate || "미정"}</span>
+                      </div>
+
+                      <div className="flex min-w-0 items-center gap-1">
+                        <Building size={14} className="shrink-0 text-violet-200/80" />
+                        <span className="truncate">{studio || "미정"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={animeList.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
+        </>
+      )}
+    </section>
   );
 };
 

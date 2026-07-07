@@ -7,8 +7,8 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 6,
 
   const getPageNumbers = () => {
     const pages = [];
-    let start = Math.max(currentPage, 1);
-    let end = Math.min(start + maxPageButtons - 1, totalPages);
+    const start = Math.max(currentPage, 1);
+    const end = Math.min(start + maxPageButtons - 1, totalPages);
 
     for (let i = start; i <= end; i++) pages.push(i);
     return pages;
@@ -19,39 +19,45 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 6,
     onPageChange(page);
   };
 
+  const buttonBase =
+    "rounded-md border border-stone-100/10 px-3 py-1.5 text-sm font-semibold transition duration-200 focus:outline-none focus:ring-4 focus:ring-amber-500/20";
+
   return (
-    <div className="flex justify-center mt-10 gap-2 flex-wrap">
-      {/* 이전 버튼 */}
+    <div className="mt-10 flex flex-wrap justify-center gap-2">
       <button
         onClick={() => currentPage > 1 && changePage(Math.max(currentPage - 6, 1))}
-        className={`px-3 py-1 rounded-2xl hover:bg-gray-100 transition ${
-          currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
+        className={`${buttonBase} ${
+          currentPage === 1
+            ? "cursor-not-allowed opacity-40"
+            : "bg-[#181816] text-stone-300 hover:-translate-y-0.5 hover:border-amber-500 hover:text-amber-300"
         }`}
       >
-        ◀ 이전
+        이전
       </button>
 
-      {/* 페이지 번호 */}
-      {getPageNumbers().map((p, _) => (
+      {getPageNumbers().map((page) => (
         <button
-          key={p}
-          onClick={() => changePage(p)}
-          className={`px-3 py-1 rounded-2xl text-sm ${
-            currentPage === p ? "bg-red-600 text-white" : "hover:bg-gray-300"
+          key={page}
+          onClick={() => changePage(page)}
+          className={`${buttonBase} ${
+            currentPage === page
+              ? "border-red-500 bg-red-600 text-white"
+              : "bg-[#181816] text-stone-300 hover:-translate-y-0.5 hover:border-amber-500 hover:text-amber-300"
           }`}
         >
-          {p}
+          {page}
         </button>
       ))}
 
-      {/* 다음 버튼 */}
       <button
         onClick={() => currentPage < totalPages && changePage(Math.min(currentPage + 6, totalPages))}
-        className={`px-3 py-1 rounded-2xl hover:bg-gray-100 transition ${
-          currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
+        className={`${buttonBase} ${
+          currentPage === totalPages
+            ? "cursor-not-allowed opacity-40"
+            : "bg-[#181816] text-stone-300 hover:-translate-y-0.5 hover:border-amber-500 hover:text-amber-300"
         }`}
       >
-        다음 ▶
+        다음
       </button>
     </div>
   );

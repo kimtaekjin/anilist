@@ -243,17 +243,27 @@ export const queries = {
           }
           coverImage {
             large
+            extraLarge
           }
           startDate {
             year
+            month
+            day
           }
           season
+          seasonYear
           studios {
             nodes {
               name
             }
           }
           genres
+          format
+          status
+          averageScore
+          popularity
+          episodes
+          bannerImage
         }
       }
     }

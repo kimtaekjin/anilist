@@ -85,8 +85,11 @@ const AnimeDetail = () => {
       </div>
 
       <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-2">줄거리</h2>
-        <p className="leading-relaxed text-gray-700" dangerouslySetInnerHTML={{ __html: anime?.description }} />
+        <h2 className="text-2xl font-bold mb-2 text-stone-50">줄거리</h2>
+        <p
+          className="leading-relaxed text-stone-100"
+          dangerouslySetInnerHTML={{ __html: anime?.description }}
+        />
       </div>
 
       {anime?.trailer?.site === "youtube" && (

@@ -63,13 +63,16 @@ router.post("/login", async (req, res) => {
     user.isLoggedIn = true;
     await user.save();
 
-    const token = jwt.sign(
-      { userId: user._id, email: user.email, userName: user.username, admin: user.admin },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "24h",
-      },
-    );
+    const authUser = {
+      userId: user._id.toString(),
+      email: user.email,
+      userName: user.username,
+      admin: user.admin,
+    };
+
+    const token = jwt.sign(authUser, process.env.JWT_SECRET, {
+      expiresIn: "24h",
+    });
     const isProd = process.env.NODE_ENV === "production";
 
     res.cookie("token", token, {
@@ -79,10 +82,7 @@ router.post("/login", async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000, // 24시간
     });
 
-    const userWithoutPassword = user.toObject();
-    delete userWithoutPassword.password;
-
-    res.json({ user: userWithoutPassword });
+    res.json({ user: authUser, message: "로그인되었습니다." });
   } catch (error) {
     console.error("로그인 오류:", error.message);
     res.status(500).json({ message: "서버 오류가 발생했습니다." });

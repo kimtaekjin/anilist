@@ -1,16 +1,25 @@
 import "dotenv/config";
+import crypto from "crypto";
 import fetch from "node-fetch";
-import wanakana from "wanakana";
+import mongoose from "mongoose";
+import redis from "../config/redis.js";
 import Translation from "../models/Translate.js";
-import { wordReplacements, replacements } from "./wordReplace.js";
 
-const GOOGLE_KEY = process.env.GOOGLETRANSLATION;
-const TRANSLATION_ENDPOINT = "https://api.langbly.com/language/translate/v2";
+const DEEPL_AUTH_KEY = process.env.translationAPI;
+const TRANSLATION_PROVIDER = "deepl";
+const TRANSLATION_ENDPOINT =
+  process.env.TRANSLATION_ENDPOINT ||
+  (DEEPL_AUTH_KEY?.endsWith(":fx")
+    ? "https://api-free.deepl.com/v2/translate"
+    : "https://api.deepl.com/v2/translate");
 const REQUEST_INTERVAL_MS = Number(process.env.TRANSLATION_REQUEST_INTERVAL_MS || 1500);
 const DEFAULT_COOLDOWN_MS = 1000 * 60;
+const REDIS_CACHE_TTL_SECONDS = Number(process.env.TRANSLATION_REDIS_TTL_SECONDS || 60 * 60 * 24 * 30);
 
 let lastTranslationRequestAt = 0;
 let translationCooldownUntil = 0;
+let translationQueue = Promise.resolve();
+let hasLoggedMissingKey = false;
 
 const memoryCache = new Map();
 const inflightTranslations = new Map();
@@ -18,7 +27,16 @@ const inflightTranslations = new Map();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function getCacheKey(text, sourceLang, targetLang) {
-  return `${sourceLang}:${targetLang}:${text}`;
+  return `${sourceLang || "auto"}:${targetLang}:${text}`;
+}
+
+function getRedisCacheKey(text, sourceLang, targetLang) {
+  const hash = crypto
+    .createHash("sha256")
+    .update(getCacheKey(text, sourceLang, targetLang))
+    .digest("hex");
+
+  return `translation:${TRANSLATION_PROVIDER}:${hash}`;
 }
 
 function getRetryAfterMs(response, errorBody) {
@@ -29,7 +47,7 @@ function getRetryAfterMs(response, errorBody) {
 
   try {
     const parsed = JSON.parse(errorBody);
-    const retryAfterSeconds = parsed?.error?.retry_after_seconds;
+    const retryAfterSeconds = parsed?.error?.retry_after_seconds || parsed?.retry_after_seconds;
     if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
       return retryAfterSeconds * 1000;
     }
@@ -40,8 +58,26 @@ function getRetryAfterMs(response, errorBody) {
   return DEFAULT_COOLDOWN_MS;
 }
 
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function hasKorean(text) {
+  return /[\uac00-\ud7a3]/.test(text);
+}
+
+function hasJapanese(text) {
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(text);
+}
+
+function hasLatin(text) {
+  return /[A-Za-z]/.test(text) && !hasKorean(text) && !hasJapanese(text);
+}
+
+function shouldIgnoreCachedTranslation(originalText, translatedText) {
+  return translatedText === originalText && !hasKorean(originalText);
+}
+
+function getSourceLang(text) {
+  if (hasJapanese(text)) return "ja";
+  if (hasLatin(text)) return "en";
+  return null;
 }
 
 async function waitForTranslationSlot() {
@@ -60,88 +96,93 @@ async function waitForTranslationSlot() {
   lastTranslationRequestAt = Date.now();
 }
 
-export function romajiToKatakana(text) {
-  if (!text) return "";
+function enqueueTranslation(task) {
+  const run = translationQueue.then(task, task);
+  translationQueue = run.catch(() => {});
+  return run;
+}
 
-  let converted = text.toLowerCase();
+function normalizeDeepLSourceLang(source) {
+  if (source === "ja") return "JA";
+  if (source === "en") return "EN";
+  return null;
+}
 
-  for (const [pattern, repl] of replacements) {
-    converted = converted.replace(new RegExp(pattern, "g"), repl);
+function normalizeDeepLTargetLang(target) {
+  if (target === "ko") return "KO";
+  if (target === "ja") return "JA";
+  if (target === "en") return "EN-US";
+  return target.toUpperCase();
+}
+
+function buildDeepLRequestBody(text, source, target) {
+  const body = {
+    text: [text],
+    target_lang: normalizeDeepLTargetLang(target),
+  };
+
+  const sourceLang = normalizeDeepLSourceLang(source);
+  if (sourceLang) {
+    body.source_lang = sourceLang;
   }
 
-  converted = converted.replace(/(\d+)(st|nd|rd|th)/gi, (_, num) => `${num} セカンド`);
+  return body;
+}
 
-  return converted.replace(/[a-zA-Z]+/g, (match) => wanakana.toKatakana(match.toLowerCase()));
+function parseDeepLResponse(data, fallbackText) {
+  return data?.translations?.[0]?.text || fallbackText;
 }
 
 export async function translate(text, source, target) {
-  if (!GOOGLE_KEY) {
+  if (!DEEPL_AUTH_KEY) {
+    if (!hasLoggedMissingKey) {
+      console.warn("translationAPI is not configured. Returning untranslated text.");
+      hasLoggedMissingKey = true;
+    }
     return text;
   }
 
-  await waitForTranslationSlot();
+  return enqueueTranslation(async () => {
+    await waitForTranslationSlot();
 
-  const bodyPayload = {
-    q: text,
-    target,
-  };
+    const response = await fetch(TRANSLATION_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `DeepL-Auth-Key ${DEEPL_AUTH_KEY}`,
+      },
+      body: JSON.stringify(buildDeepLRequestBody(text, source, target)),
+    });
 
-  if (source && source !== "auto") {
-    bodyPayload.source = source;
-  }
+    if (!response.ok) {
+      const errorBody = await response.text();
 
-  const response = await fetch(TRANSLATION_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": GOOGLE_KEY,
-    },
-    body: JSON.stringify(bodyPayload),
-  });
+      if (response.status === 429 || response.status === 456) {
+        translationCooldownUntil = Date.now() + getRetryAfterMs(response, errorBody);
+      }
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-
-    if (response.status === 429) {
-      translationCooldownUntil = Date.now() + getRetryAfterMs(response, errorBody);
+      const error = new Error(`Translation API error ${response.status} ${response.statusText}: ${errorBody}`);
+      error.status = response.status;
+      error.body = errorBody;
+      throw error;
     }
 
-    const error = new Error(`Translation API error ${response.status}: ${errorBody}`);
-    error.status = response.status;
-    error.body = errorBody;
-    throw error;
-  }
-
-  const data = await response.json();
-  return data.data?.translations?.[0]?.translatedText || text;
-}
-
-export function isRomaji(text) {
-  if (!text) return false;
-  if (!/^[A-Za-z\s]+$/.test(text)) return false;
-
-  const words = text.trim().split(/\s+/);
-  if (words.length < 2 || words.length > 3) return false;
-  if (!words.every((word) => /^[A-Z][a-z]+$/.test(word))) return false;
-
-  const englishBlacklist = ["The", "Of", "And"];
-  return !words.some((word) => englishBlacklist.includes(word));
+    const data = await response.json();
+    return parseDeepLResponse(data, text);
+  });
 }
 
 export function replaceMistranslation(translatedText) {
   if (!translatedText) return "";
 
-  let fixed = translatedText.trim();
-
-  for (const { from, to } of wordReplacements) {
-    const patterns = Array.isArray(from) ? from : [from];
-
-    for (const pattern of patterns) {
-      fixed = fixed.replace(new RegExp(escapeRegExp(String(pattern)), "gi"), to);
-    }
-  }
-
-  return fixed;
+  return translatedText
+    .trim()
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, "\"")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 async function findCachedTranslation(originalText, sourceLang, targetLang) {
@@ -151,10 +192,41 @@ async function findCachedTranslation(originalText, sourceLang, targetLang) {
     return memoryCache.get(cacheKey);
   }
 
+  const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang);
+  if (redis.isOpen) {
+    try {
+      const cached = await redis.get(redisCacheKey);
+      if (cached && !shouldIgnoreCachedTranslation(originalText, cached)) {
+        memoryCache.set(cacheKey, cached);
+        return cached;
+      }
+    } catch (error) {
+      console.error("Translation Redis cache lookup failed:", error.message);
+    }
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    return null;
+  }
+
   try {
-    const cached = await Translation.findOne({ originalText, sourceLang, targetLang }).lean();
+    const cached = await Translation.findOne({
+      provider: TRANSLATION_PROVIDER,
+      originalText,
+      sourceLang: sourceLang || "auto",
+      targetLang,
+    }).lean();
     if (cached?.translatedText) {
+      if (shouldIgnoreCachedTranslation(originalText, cached.translatedText)) {
+        return null;
+      }
+
       memoryCache.set(cacheKey, cached.translatedText);
+      if (redis.isOpen) {
+        await redis.setEx(redisCacheKey, REDIS_CACHE_TTL_SECONDS, cached.translatedText).catch((error) => {
+          console.error("Translation Redis cache save failed:", error.message);
+        });
+      }
       return cached.translatedText;
     }
   } catch (error) {
@@ -165,12 +237,32 @@ async function findCachedTranslation(originalText, sourceLang, targetLang) {
 }
 
 async function saveCachedTranslation(originalText, sourceLang, targetLang, translatedText) {
+  if (shouldIgnoreCachedTranslation(originalText, translatedText)) {
+    return;
+  }
+
   const cacheKey = getCacheKey(originalText, sourceLang, targetLang);
   memoryCache.set(cacheKey, translatedText);
 
+  if (redis.isOpen) {
+    const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang);
+    await redis.setEx(redisCacheKey, REDIS_CACHE_TTL_SECONDS, translatedText).catch((error) => {
+      console.error("Translation Redis cache save failed:", error.message);
+    });
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    return;
+  }
+
   try {
     await Translation.updateOne(
-      { originalText, sourceLang, targetLang },
+      {
+        provider: TRANSLATION_PROVIDER,
+        originalText,
+        sourceLang: sourceLang || "auto",
+        targetLang,
+      },
       { $set: { translatedText } },
       { upsert: true },
     );
@@ -179,7 +271,7 @@ async function saveCachedTranslation(originalText, sourceLang, targetLang, trans
   }
 }
 
-async function translateWithCache(originalText, convertedText, sourceLang, targetLang) {
+async function translateWithCache(originalText, sourceLang, targetLang) {
   const cached = await findCachedTranslation(originalText, sourceLang, targetLang);
   if (cached) return cached;
 
@@ -188,7 +280,7 @@ async function translateWithCache(originalText, convertedText, sourceLang, targe
     return inflightTranslations.get(cacheKey);
   }
 
-  const translationPromise = translate(convertedText, sourceLang, targetLang)
+  const translationPromise = translate(originalText, sourceLang, targetLang)
     .then((translatedText) => replaceMistranslation(translatedText))
     .then(async (translatedText) => {
       await saveCachedTranslation(originalText, sourceLang, targetLang, translatedText);
@@ -207,23 +299,17 @@ export async function traslateItem(text) {
 
   const targetLang = "ko";
   const originalText = text.trim();
-  if (!originalText) return "";
-
-  let sourceLang = "auto";
-  let convertedText = originalText;
-
-  if (isRomaji(originalText)) {
-    sourceLang = "ja";
-    convertedText = romajiToKatakana(originalText);
-  }
+  if (!originalText || hasKorean(originalText)) return originalText;
 
   try {
-    return await translateWithCache(originalText, convertedText, sourceLang, targetLang);
+    return await translateWithCache(originalText, getSourceLang(originalText), targetLang);
   } catch (error) {
-    if (error.status !== 429) {
+    if (error.status !== 429 && error.status !== 456) {
       console.error("Translation failed:", error.message);
     }
 
     return text;
   }
 }
+
+export const translateItem = traslateItem;

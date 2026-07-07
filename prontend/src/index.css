@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #10100f;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, rgba(220, 38, 38, 0.14), transparent 30rem),
+    linear-gradient(180deg, #15130f 0%, #10100f 42%, #0b0b0a 100%);
+  color: #f5f1e8;
+}
+
+body {
+  margin: 0;
+}

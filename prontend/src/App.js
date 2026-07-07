@@ -20,7 +20,7 @@ function Layout() {
   return (
     <>
       <Navbar />
-      <main className="pt-20">
+      <main className="min-h-screen pt-20 text-stone-100">
         <Outlet />
       </main>
       <Footer />

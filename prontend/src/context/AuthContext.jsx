@@ -13,9 +13,12 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get(`${API_URL}/user/verify-token`, {
         withCredentials: true,
       });
-      setUser(response.data.user || null);
+      const authUser = response.data.user || null;
+      setUser(authUser);
+      return authUser;
     } catch (error) {
       setUser(null);
+      return null;
     } finally {
       setLoading(false);
     }

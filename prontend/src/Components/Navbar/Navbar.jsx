@@ -3,21 +3,25 @@ import { useAuth } from "../../context/AuthContext";
 import { useState } from "react";
 import { HiMenu, HiX } from "react-icons/hi";
 
+const menuItems = [
+  { path: "/Airing", label: "방영중" },
+  { path: "/Genre", label: "장르/분기" },
+  { path: "/Upcoming", label: "예정작" },
+  { path: "/board", label: "게시판" },
+];
+
 const Navbar = () => {
   const { isLogin, logout, user } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const menuItems = [
-    { path: "/Airing", key: "방영중" },
-    { path: "/Genre", key: "장르 · 분기" },
-    { path: "/Upcoming", key: "예정작" },
-    { path: "/board", key: "게시판" },
-  ];
-
   const MenuItem = ({ path, label, onClick }) => (
     <li>
-      <Link to={path} className="block py-2 px-4 hover:text-gray-500 transition" onClick={onClick}>
+      <Link
+        to={path}
+        className="block rounded-md px-3 py-2 text-sm font-semibold text-stone-300 transition duration-200 hover:bg-stone-100/5 hover:text-amber-300"
+        onClick={onClick}
+      >
         {label}
       </Link>
     </li>
@@ -28,40 +32,46 @@ const Navbar = () => {
     try {
       const response = await logout();
       if (response) {
-        alert(response.message || "로그아웃 되었습니다.");
+        alert(response.message || "로그아웃되었습니다.");
         setMenuOpen(false);
         navigate("/");
       }
     } catch (error) {
       console.error(error);
-      alert("로그아웃 실패");
+      alert("로그아웃에 실패했습니다.");
     }
   };
 
   return (
-    <nav className="fixed top-0 left-0 w-full bg-[rgb(220,225,235)] shadow-lg z-50">
-      <div className="max-w-6xl mx-auto flex justify-between items-center py-4 px-6">
-        <Link to="/" className="text-2xl font-bold text-gray-800 border-2 border-black px-2">
+    <nav className="fixed left-0 top-0 z-50 w-full border-b border-stone-100/10 bg-[#12110f]/92 shadow-2xl shadow-black/25 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <Link
+          to="/"
+          className="rounded-md border border-amber-400/40 px-2 py-1 text-2xl font-black tracking-normal text-stone-50 transition duration-200 hover:border-amber-300 hover:text-amber-200"
+        >
           AniWiki
         </Link>
 
-        <ul className="hidden md:flex gap-5 text-lg">
+        <ul className="hidden items-center gap-2 md:flex">
           {menuItems.map((item) => (
-            <MenuItem key={item.key} path={item.path} label={item.key} />
+            <MenuItem key={item.path} path={item.path} label={item.label} />
           ))}
         </ul>
 
-        {/* 모바일 햄버거 버튼 */}
-        <button className="md:hidden text-2xl" onClick={() => setMenuOpen(!menuOpen)}>
+        <button
+          className="rounded-md p-2 text-2xl text-stone-100 transition hover:bg-stone-100/10 md:hidden"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="메뉴 열기"
+        >
           {menuOpen ? <HiX /> : <HiMenu />}
         </button>
 
-        <div className="hidden md:flex items-center space-x-2">
+        <div className="hidden items-center gap-2 md:flex">
           {isLogin ? (
             <>
-              <p>{user.userName}님 환영합니다.</p>
+              <p className="max-w-40 truncate text-sm font-semibold text-stone-300">{user.userName}님</p>
               <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white transition duration-200 hover:bg-red-500"
                 onClick={handleLogout}
               >
                 로그아웃
@@ -70,12 +80,12 @@ const Navbar = () => {
           ) : (
             <>
               <Link to="/user/login">
-                <button className="px-4 py-2 border border-gray-500 rounded hover:text-gray-500 transition">
+                <button className="rounded-md border border-stone-100/20 px-4 py-2 text-sm font-bold text-stone-200 transition duration-200 hover:border-amber-400 hover:text-amber-300">
                   로그인
                 </button>
               </Link>
               <Link to="/user/singUp">
-                <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
+                <button className="rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white transition duration-200 hover:bg-red-500">
                   회원가입
                 </button>
               </Link>
@@ -85,26 +95,26 @@ const Navbar = () => {
       </div>
 
       {menuOpen && (
-        <div className="md:hidden bg-[rgb(220,225,235)] border-t border-gray-300">
-          <ul className="flex flex-col">
+        <div className="border-t border-stone-100/10 bg-[#12110f] md:hidden">
+          <ul className="flex flex-col px-4 py-3">
             {menuItems.map((item) => (
-              <MenuItem key={item.path} path={item.path} label={item.key} onClick={() => setMenuOpen(false)} />
+              <MenuItem key={item.path} path={item.path} label={item.label} onClick={() => setMenuOpen(false)} />
             ))}
-            <div className="flex flex-col p-4 space-y-2">
+            <div className="flex flex-col gap-2 py-3">
               {isLogin ? (
                 <>
-                  <p>{user.userName}님 환영합니다.</p>
+                  <p className="px-3 text-sm font-semibold text-stone-300">{user.userName}님</p>
                   <button
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                    className="rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500"
                     onClick={handleLogout}
                   >
                     로그아웃
                   </button>
                 </>
               ) : (
-                <div className="flex  space-x-2">
+                <div className="flex gap-2">
                   <button
-                    className="px-4 py-2 border border-gray-500 rounded hover:text-gray-500 transition"
+                    className="rounded-md border border-stone-100/20 px-4 py-2 text-sm font-bold text-stone-200 transition hover:border-amber-400 hover:text-amber-300"
                     onClick={() => {
                       setMenuOpen(false);
                       navigate("/user/login");
@@ -114,7 +124,7 @@ const Navbar = () => {
                   </button>
 
                   <button
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                    className="rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500"
                     onClick={() => {
                       setMenuOpen(false);
                       navigate("/user/singUp");

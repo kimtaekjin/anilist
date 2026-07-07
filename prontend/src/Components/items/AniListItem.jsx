@@ -2,10 +2,11 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_CLIENT_URL;
 
-export const fetchAniList = async (type, selectedSeason, selectedYear) => {
+export const fetchAniList = async (type, selectedSeason, selectedYear, extraParams = {}) => {
   const body = {
     season: selectedSeason,
     year: selectedYear,
+    ...extraParams,
   };
   try {
     let response = await axios.get(`${API_URL}/service/anime/${type}`, {

@@ -44,7 +44,7 @@ export const queries = {
   completed: `
     query {
       Page(perPage: 50) {
-        media(type: ANIME, format: TV, sort: TRENDING_DESC, status: FINISHED) {
+        media(type: ANIME, format: TV, sort: SCORE_DESC, status: FINISHED) {
           id
           title {
             romaji

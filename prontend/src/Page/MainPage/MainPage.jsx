@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { fetchAniList } from "../../Components/items/AniListItem";
 import MainPageCard from "./MainPageCard";
 
+const getAnimeId = (anime) => anime?._id ?? anime?.id;
+
 const MainPage = () => {
   const [trendingAnime, setTrendingAnime] = useState([]);
   const [completedAnime, setCompletedAnime] = useState([]);
@@ -10,13 +12,15 @@ const MainPage = () => {
   useEffect(() => {
     const fetchAnime = async () => {
       try {
-        const [trending, completed, ovaAni] = await Promise.all([
-          fetchAniList("trending"),
-          fetchAniList("completed"),
-          fetchAniList("ova"),
-        ]);
+        const [trending, ovaAni] = await Promise.all([fetchAniList("trending"), fetchAniList("ova")]);
+        const trendingList = trending || [];
+        const trendingIds = trendingList.map(getAnimeId).filter(Boolean).join(",");
 
-        setTrendingAnime(trending || []);
+        const completed = await fetchAniList("completed", undefined, undefined, {
+          exclude: trendingIds,
+        });
+
+        setTrendingAnime(trendingList);
         setCompletedAnime(completed || []);
         setOvaAnime(ovaAni || []);
       } catch (err) {

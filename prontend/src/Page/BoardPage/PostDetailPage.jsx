@@ -1,8 +1,26 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 import { PostDetailSkeleton } from "../../Components/items/Skeleton";
+
+const TEXT = {
+  loginRequiredForComment: "\uB85C\uADF8\uC778 \uD6C4 \uB313\uAE00\uC744 \uC791\uC131\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+  commentRequired: "\uB313\uAE00\uC744 \uC785\uB825\uD574\uC8FC\uC138\uC694.",
+  commentCreated: "\uB313\uAE00\uC744 \uC791\uC131\uD588\uC2B5\uB2C8\uB2E4.",
+  serverError: "\uC11C\uBC84\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.",
+  deleteConfirm: "\uC815\uB9D0 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+  postDeleted: "\uAC8C\uC2DC\uAE00\uC744 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.",
+  noPermission: "\uC0AD\uC81C \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+  author: "\uC791\uC131\uC790",
+  edit: "\uC218\uC815",
+  delete: "\uC0AD\uC81C",
+  backToList: "\uBAA9\uB85D\uC73C\uB85C",
+  comments: "\uB313\uAE00",
+  noComments: "\uC544\uC9C1 \uB313\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+  commentPlaceholder: "\uB313\uAE00\uC744 \uC785\uB825\uD558\uC138\uC694",
+  submit: "\uB4F1\uB85D",
+};
 
 export default function PostDetailPage() {
   const { id } = useParams();
@@ -15,6 +33,11 @@ export default function PostDetailPage() {
   const [comment, setComment] = useState("");
   const isAdmin = user?.admin === true;
 
+  const fetchComments = useCallback(async () => {
+    const res = await axios.get(`${API_URL}/post/${id}/comments`);
+    setComments(Array.isArray(res.data) ? res.data : []);
+  }, [API_URL, id]);
+
   useEffect(() => {
     const fetchPost = async () => {
       const res = await axios.get(`${API_URL}/post/${id}`, {
@@ -23,78 +46,73 @@ export default function PostDetailPage() {
       setPost(res.data);
     };
 
-    const fetchComments = async () => {
-      const res = await axios.get(`${API_URL}/post/${id}/comments`);
-      setComments(res.data);
-    };
-
     fetchPost();
     fetchComments();
-  }, [id, API_URL]);
+  }, [id, API_URL, fetchComments]);
 
-  // 댓글 등록
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
 
     if (!user) {
-      alert("로그인 후 댓글을 작성할 수 있습니다.");
+      alert(TEXT.loginRequiredForComment);
       return;
     }
-    try {
-      const payload = {
-        content: comment,
-        userId: user.userId,
-        author: user.userName,
-      };
 
-      const response = await axios.post(`${API_URL}/post/${id}/comment`, payload, { withCredentials: true });
+    if (!comment.trim()) {
+      alert(TEXT.commentRequired);
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/post/${id}/comment`,
+        { content: comment.trim() },
+        { withCredentials: true }
+      );
 
       if (response) {
         setComment("");
-        alert("댓글이 작성되었습니다.");
-
-        const res = await axios.get(`${API_URL}/post/${id}/comments`);
-        setComments(res.data);
+        alert(TEXT.commentCreated);
+        await fetchComments();
       }
     } catch (error) {
       if (error.response) {
         alert(error.response.data.message);
       } else {
-        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+        alert(TEXT.serverError);
       }
     }
   };
 
-  //게시판 삭제
   const handleDelete = async () => {
-    const ok = window.confirm("정말 삭제하시겠습니까?");
+    const ok = window.confirm(TEXT.deleteConfirm);
     if (!ok) return;
+
     try {
       const res = await axios.delete(`${API_URL}/post/${id}`, {
         withCredentials: true,
       });
 
       if (res.status === 200) {
-        alert("게시글이 삭제되었습니다.");
+        alert(TEXT.postDeleted);
         navigate("/board");
       }
     } catch (error) {
       if (error.response) {
         alert(error.response.data.message);
       } else {
-        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+        alert(TEXT.serverError);
       }
     }
   };
 
-  //댓글 삭제
   const handleCommentDelete = async (commentId, commentUserId) => {
     if (!user || (user.userId !== commentUserId && !isAdmin)) {
-      alert("삭제 권한이 없습니다.");
+      alert(TEXT.noPermission);
       return;
     }
 
-    const ok = window.confirm("정말 삭제하시겠습니까?");
+    const ok = window.confirm(TEXT.deleteConfirm);
     if (!ok) return;
 
     try {
@@ -103,114 +121,121 @@ export default function PostDetailPage() {
       });
 
       if (res.status === 200) {
-        // 삭제 후 상태에서 댓글 제거
         setComments((prev) => prev.filter((c) => c._id !== commentId));
         alert(res.data.message);
-        console.log(res);
       }
     } catch (error) {
-      console.log(error);
-      alert(error.response.data.message);
+      if (error.response) {
+        alert(error.response.data.message);
+      } else {
+        alert(TEXT.serverError);
+      }
     }
   };
 
   if (!post) return <PostDetailSkeleton />;
 
+  const isAuthor = user && post.userId?.toString() === user.userId;
+
   return (
-    <div className="bg-white min-h-screen py-10">
-      <div className="max-w-4xl mx-auto border border-gray-300">
-        {/* 헤더 */}
-        <div className="flex justify-between px-6 py-4 border-b border-gray-300 bg-gray-200">
-          {/* 왼쪽 영역 */}
-          <div className="max-w-2xl">
-            <h2 className="text-xl font-bold truncate">{post.title}</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              작성자: {post.author} · {post.createdAt}
+    <section className="mx-auto min-h-screen max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+      <article className="overflow-hidden rounded-lg border border-stone-100/10 bg-[#181816] shadow-xl shadow-black/25">
+        <header className="flex flex-col gap-4 border-b border-stone-100/10 bg-stone-100/5 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="truncate text-2xl font-bold text-stone-50">{post.title}</h2>
+            <p className="mt-2 text-sm text-stone-400">
+              {TEXT.author} {post.author} <span className="mx-2 text-stone-600">/</span> {post.createdAt}
             </p>
           </div>
 
-          {/* 오른쪽 버튼 영역 (작성자만 보여줌) */}
           {user && (
-            <div className="flex ml-3 py-1 text-gray-600 text-sm space-x-2">
-              {post.userId.toString() === user.userId && (
-                <button type="button" onClick={() => navigate(`/board/edit/${id}`)} className="h-2 hover:text-gray-700">
-                  수정
+            <div className="flex shrink-0 items-center gap-2 text-sm font-semibold">
+              {isAuthor && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/board/edit/${id}`)}
+                  className="rounded-md border border-amber-400/30 px-3 py-1.5 text-amber-200 transition hover:bg-amber-400/10"
+                >
+                  {TEXT.edit}
                 </button>
               )}
 
-              {(post.userId.toString() === user.userId || isAdmin) && (
-                <button type="button" className="h-2 hover:text-gray-700" onClick={handleDelete}>
-                  삭제
+              {(isAuthor || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="rounded-md border border-red-400/30 px-3 py-1.5 text-red-200 transition hover:bg-red-500/10"
+                >
+                  {TEXT.delete}
                 </button>
               )}
             </div>
           )}
+        </header>
+
+        <div className="min-h-[30rem] whitespace-pre-wrap bg-[#10100f] p-6 text-sm leading-7 text-stone-100">
+          {post.content}
         </div>
-        {/* 본문 */}
-        <div className="p-6 min-h-[30rem] bg-gray-50 whitespace-pre-wrap leading-relaxed text-sm">{post.content}</div>
-        {/* 하단 버튼 */}
-        <div className="flex justify-between px-6 py-4 border-t border-gray-200">
+
+        <div className="flex justify-between border-t border-stone-100/10 px-6 py-4">
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 text-sm border border-gray-400 text-gray-600 hover:bg-gray-200"
+            className="rounded-md border border-stone-100/15 px-4 py-2 text-sm font-semibold text-stone-300 transition hover:border-amber-500 hover:text-amber-300"
           >
-            목록으로
+            {TEXT.backToList}
           </button>
         </div>
-        {/* 댓글 영역 */}
-        <div className="px-6 py-4 border-t border-gray-300 bg-white">
-          <h3 className="font-semibold mb-3">댓글 {comments.length}개</h3>
 
-          {/* 댓글 목록 */}
-          <div className="space-y-3 mb-6">
+        <section className="border-t border-stone-100/10 bg-[#151513] px-6 py-5">
+          <h3 className="mb-4 font-bold text-stone-100">
+            {TEXT.comments} <span className="text-amber-300">{comments.length}</span>
+          </h3>
+
+          <div className="mb-6 space-y-3">
             {comments.map((c) => (
-              <div key={c._id} className="border-b pb-2 flex justify-between items-start">
-                <div>
-                  <p className="text-sm">{c.content}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {c.author} · {c.createdAt}
+              <div
+                key={c._id}
+                className="flex items-start justify-between gap-3 rounded-md border border-stone-100/10 bg-[#10100f] p-4"
+              >
+                <div className="min-w-0">
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-stone-100">{c.content}</p>
+                  <p className="mt-2 text-xs text-stone-500">
+                    {c.author} <span className="mx-1 text-stone-700">/</span> {c.createdAt}
                   </p>
                 </div>
 
                 {((user && c.userId === user.userId) || isAdmin) && (
                   <button
+                    type="button"
                     onClick={() => handleCommentDelete(c._id, c.userId)}
-                    className="text-xs text-red-500 hover:text-red-700 ml-2"
+                    className="shrink-0 text-xs font-bold text-red-300 transition hover:text-red-200"
                   >
-                    삭제
+                    {TEXT.delete}
                   </button>
                 )}
               </div>
             ))}
 
-            {comments.length === 0 && <p className="text-sm text-gray-400">아직 댓글이 없습니다.</p>}
+            {comments.length === 0 && <p className="text-sm text-stone-500">{TEXT.noComments}</p>}
           </div>
 
-          {/* 댓글 작성 */}
-          <form onSubmit={handleCommentSubmit} className="flex gap-2">
+          <form onSubmit={handleCommentSubmit} className="flex flex-col gap-3 sm:flex-row">
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="댓글을 입력하세요"
-              className="
-                flex-1 h-20 p-2 text-sm
-                border border-gray-300 resize-none
-                focus:outline-none focus:border-blue-600
-              "
+              placeholder={TEXT.commentPlaceholder}
+              className="h-24 flex-1 resize-none rounded-md border border-stone-100/10 bg-[#10100f] p-3 text-sm leading-6 text-stone-100 outline-none transition placeholder:text-stone-500 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15"
             />
             <button
               type="submit"
-              className="
-                px-4 py-2 text-sm font-semibold
-                bg-gray-700 text-white
-                hover:bg-gray-800
-              "
+              className="rounded-md bg-red-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/20 sm:self-stretch"
             >
-              등록
+              {TEXT.submit}
             </button>
           </form>
-        </div>
-      </div>
-    </div>
+        </section>
+      </article>
+    </section>
   );
 }

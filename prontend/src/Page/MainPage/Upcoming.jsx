@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Building, CalendarDays, Clapperboard } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Building, CalendarDays, Clapperboard, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchAniList } from "../../Components/items/AniListItem.jsx";
 import { UpcommingSkeleton } from "../../Components/items/Skeleton";
@@ -8,13 +8,11 @@ import Pagination from "../../Components/Pagination/Pagination.jsx";
 const Upcoming = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [animeList, setAnimeList] = useState([]);
+  const [searchName, setSearchName] = useState("");
   const navigate = useNavigate();
 
   const itemsPerPage = 18;
   const [currentPage, setCurrentPage] = useState(1);
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentItems = animeList.slice(startIndex, startIndex + itemsPerPage);
 
   useEffect(() => {
     const fetchUpcomingAnime = async () => {
@@ -35,14 +33,40 @@ const Upcoming = () => {
     fetchUpcomingAnime();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchName]);
+
+  const filteredList = useMemo(() => {
+    const keyword = searchName.trim().toLowerCase();
+    if (!keyword) return animeList;
+
+    return animeList.filter((anime) => anime.title?.toLowerCase().includes(keyword));
+  }, [animeList, searchName]);
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentItems = filteredList.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <section className="mx-auto min-h-screen max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-3">
+      <div className="mb-6 flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
           <Clapperboard size={16} />
           <span>Coming Soon</span>
         </div>
         <h1 className="text-3xl font-bold tracking-normal text-stone-50 sm:text-4xl">방영 예정작</h1>
+      </div>
+
+      <div className="mb-8 max-w-xl rounded-lg border border-stone-100/10 bg-[#181816]/90 p-2 shadow-xl shadow-black/25 backdrop-blur">
+        <label className="flex h-11 items-center gap-2 rounded-md border border-stone-100/10 bg-[#10100f] px-3 transition duration-200 focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-500/15 hover:border-amber-500/60">
+          <Search size={17} className="shrink-0 text-stone-500" />
+          <input
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold text-stone-100 outline-none placeholder:text-stone-500"
+            placeholder="예정작 검색"
+          />
+        </label>
       </div>
 
       {isLoading && (
@@ -53,13 +77,13 @@ const Upcoming = () => {
         </div>
       )}
 
-      {!isLoading && animeList.length === 0 && (
+      {!isLoading && filteredList.length === 0 && (
         <div className="rounded-lg border border-stone-100/10 bg-[#181816]/80 py-16 text-center text-stone-400">
-          방영 예정 작품이 없습니다.
+          조건에 맞는 방영 예정 작품이 없습니다.
         </div>
       )}
 
-      {!isLoading && animeList.length > 0 && (
+      {!isLoading && filteredList.length > 0 && (
         <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {currentItems.map((anime) => {
@@ -90,7 +114,10 @@ const Upcoming = () => {
 
                     <div className="mb-4 flex h-8 flex-wrap gap-2 overflow-hidden">
                       {genres.slice(0, 3).map((genre) => (
-                        <span key={genre} className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-200">
+                        <span
+                          key={genre}
+                          className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-200"
+                        >
                           {genre}
                         </span>
                       ))}
@@ -120,7 +147,7 @@ const Upcoming = () => {
 
           <Pagination
             currentPage={currentPage}
-            totalItems={animeList.length}
+            totalItems={filteredList.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
           />

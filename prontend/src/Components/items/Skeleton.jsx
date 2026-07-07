@@ -1,31 +1,31 @@
 //포스트 상세페이지
 export function PostDetailSkeleton() {
   return (
-    <div className="bg-white min-h-screen py-10 animate-pulse">
-      <div className="max-w-4xl mx-auto border border-gray-300">
+    <div className="min-h-screen py-10 animate-pulse">
+      <div className="max-w-4xl mx-auto overflow-hidden rounded-lg border border-stone-100/10 bg-[#181816] shadow-xl shadow-black/25">
         {/* 헤더 */}
-        <div className="px-6 py-4 border-b border-gray-300 bg-gray-200">
-          <div className="h-6 w-2/3 bg-gray-300 rounded mb-2"></div>
-          <div className="h-4 w-1/3 bg-gray-300 rounded"></div>
+        <div className="px-6 py-5 border-b border-stone-100/10 bg-stone-100/5">
+          <div className="h-7 w-2/3 bg-stone-700/70 rounded mb-3"></div>
+          <div className="h-4 w-1/3 bg-stone-800 rounded"></div>
         </div>
 
         {/* 본문 */}
-        <div className="p-6 min-h-[30rem] bg-gray-50 space-y-3">
-          <div className="h-4 bg-gray-300 rounded w-full"></div>
-          <div className="h-4 bg-gray-300 rounded w-11/12"></div>
-          <div className="h-4 bg-gray-300 rounded w-10/12"></div>
-          <div className="h-4 bg-gray-300 rounded w-9/12"></div>
-          <div className="h-4 bg-gray-300 rounded w-8/12"></div>
+        <div className="p-6 min-h-[30rem] bg-[#10100f] space-y-3">
+          <div className="h-4 bg-stone-800 rounded w-full"></div>
+          <div className="h-4 bg-stone-800 rounded w-11/12"></div>
+          <div className="h-4 bg-stone-800 rounded w-10/12"></div>
+          <div className="h-4 bg-stone-800 rounded w-9/12"></div>
+          <div className="h-4 bg-stone-800 rounded w-8/12"></div>
         </div>
 
         {/* 댓글 영역 */}
-        <div className="px-6 py-4 border-t border-gray-300 bg-white space-y-4">
-          <div className="h-4 w-24 bg-gray-300 rounded"></div>
+        <div className="px-6 py-5 border-t border-stone-100/10 bg-[#151513] space-y-4">
+          <div className="h-4 w-24 bg-stone-700/70 rounded"></div>
 
           {[1, 2, 3].map((i) => (
             <div key={i} className="space-y-2">
-              <div className="h-3 w-full bg-gray-300 rounded"></div>
-              <div className="h-3 w-1/4 bg-gray-300 rounded"></div>
+              <div className="h-3 w-full bg-stone-800 rounded"></div>
+              <div className="h-3 w-1/4 bg-stone-800 rounded"></div>
             </div>
           ))}
         </div>

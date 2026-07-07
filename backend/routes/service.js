@@ -96,6 +96,28 @@ function getListDbFilter(type, normalizedQuery) {
   return filter;
 }
 
+function getExcludedAnimeIds(query) {
+  return String(query.exclude || "")
+    .split(",")
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function filterExcludedAnime(data, excludedIds) {
+  if (!excludedIds.length) return data;
+
+  const excludedSet = new Set(excludedIds);
+  return data.filter((anime) => !excludedSet.has(Number(anime._id)));
+}
+
+function getListSort(type) {
+  if (type === "completed") {
+    return { averageScore: -1, popularity: -1 };
+  }
+
+  return { popularity: -1, averageScore: -1 };
+}
+
 async function fetchListWithLock(cacheKey, query, type, normalizedQuery) {
   if (listFetchLocks.has(cacheKey)) {
     return listFetchLocks.get(cacheKey);
@@ -305,23 +327,30 @@ router.get("/anime/:type", async (req, res) => {
     }
 
     const normalizedQuery = normalizeListQuery(type, req.query);
+    const excludedIds = getExcludedAnimeIds(req.query);
     const cacheKey = getListCacheKey(type, normalizedQuery);
     const dbFilter = getListDbFilter(type, normalizedQuery);
+    const sort = getListSort(type);
     const cached = redis.isOpen ? await redis.get(cacheKey) : null;
 
     if (cached) {
       const cachedData = readResponseCachePayload(cached);
-      if (Array.isArray(cachedData) && cachedData.length >= MIN_LIST_ITEMS) {
+      const filteredCachedData = Array.isArray(cachedData) ? filterExcludedAnime(cachedData, excludedIds) : null;
+      if (Array.isArray(filteredCachedData) && filteredCachedData.length >= MIN_LIST_ITEMS) {
         console.log(`Redis HIT ${cacheKey}`);
-        return res.json(cachedData);
+        return res.json(filteredCachedData);
       }
 
       const legacyCachedData = safeJsonParse(cached);
-      if (Array.isArray(legacyCachedData) && legacyCachedData.length >= MIN_LIST_ITEMS) {
+      const filteredLegacyCachedData = Array.isArray(legacyCachedData)
+        ? filterExcludedAnime(legacyCachedData, excludedIds)
+        : null;
+      if (Array.isArray(filteredLegacyCachedData) && filteredLegacyCachedData.length >= MIN_LIST_ITEMS) {
         console.log(`Redis HIT legacy ${cacheKey}`);
-        const localizedLegacyData = await localizeListForResponse(legacyCachedData);
+        const localizedLegacyData = await localizeListForResponse(filteredLegacyCachedData);
         if (redis.isOpen) {
-          await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedLegacyData));
+          const refreshedLegacyData = await localizeListForResponse(legacyCachedData);
+          await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(refreshedLegacyData));
         }
         return res.json(localizedLegacyData);
       }
@@ -331,14 +360,16 @@ router.get("/anime/:type", async (req, res) => {
 
     console.log(`Redis MISS ${cacheKey}`);
 
-    let data = await Anime.find(dbFilter).sort({ popularity: -1, averageScore: -1 }).lean();
+    let data = await Anime.find(dbFilter).sort(sort).lean();
+    let responseData = filterExcludedAnime(data, excludedIds);
 
-    if (data.length < MIN_LIST_ITEMS) {
+    if (responseData.length < MIN_LIST_ITEMS) {
       try {
         await fetchListWithLock(cacheKey, queries[type], type, normalizedQuery);
-        data = await Anime.find(dbFilter).sort({ popularity: -1, averageScore: -1 }).lean();
+        data = await Anime.find(dbFilter).sort(sort).lean();
+        responseData = filterExcludedAnime(data, excludedIds);
       } catch (error) {
-        if (!data.length) {
+        if (!responseData.length) {
           throw error;
         }
 
@@ -346,9 +377,9 @@ router.get("/anime/:type", async (req, res) => {
       }
     }
 
-    const localizedData = await localizeListForResponse(data);
+    const localizedData = await localizeListForResponse(responseData);
 
-    if (redis.isOpen) {
+    if (redis.isOpen && !excludedIds.length) {
       await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
     }
 

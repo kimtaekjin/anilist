@@ -1,37 +1,54 @@
 import express from "express";
-const router = express.Router();
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import dayjs from "dayjs";
 import Post from "../models/Post.js";
 import Counter from "../models/PostCounter.js";
-import dayjs from "dayjs";
-import User from "../models/User.js";
+
+const router = express.Router();
 
 router.use(express.json());
 
+const DEFAULT_CATEGORY = "자유";
+const MAX_PAGE_SIZE = 50;
+
+const messages = {
+  authRequired: "인증이 필요합니다.",
+  invalidToken: "유효하지 않은 토큰입니다.",
+  requiredFields: "제목과 내용을 입력해주세요.",
+  invalidPostId: "올바르지 않은 게시글 ID입니다.",
+  invalidCommentId: "올바르지 않은 댓글 ID입니다.",
+  postNotFound: "게시글이 존재하지 않습니다.",
+  commentNotFound: "댓글이 존재하지 않습니다.",
+  editForbidden: "수정 권한이 없습니다.",
+  deleteForbidden: "삭제 권한이 없습니다.",
+  postDeleted: "게시글을 삭제했습니다.",
+  commentRequired: "댓글 내용을 입력해주세요.",
+  commentDeleted: "댓글을 삭제했습니다.",
+  serverError: "서버 오류가 발생했습니다.",
+};
+
 const verifyToken = (req, res, next) => {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: "인증이 필요합니다." });
+  if (!token) return res.status(401).json({ message: messages.authRequired });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch (error) {
-    return res.status(401).json({ message: "유효하지 않은 토큰입니다." });
+    return res.status(401).json({ message: messages.invalidToken });
   }
 };
 
 const optionalVerifyToken = (req, res, next) => {
   const token = req.cookies.token;
-
   if (!token) {
     req.user = null;
     return next();
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     req.user = null;
   }
@@ -39,73 +56,93 @@ const optionalVerifyToken = (req, res, next) => {
   next();
 };
 
-// ----------------------
-// 날짜 포맷 헬퍼
-// ----------------------
-function formatPostDate(createdAt) {
-  const postDate = new Date(createdAt);
-  const now = new Date();
-
-  const isToday =
-    postDate.getFullYear() === now.getFullYear() &&
-    postDate.getMonth() === now.getMonth() &&
-    postDate.getDate() === now.getDate();
-
-  if (isToday) {
-    const hours = String(postDate.getHours()).padStart(2, "0");
-    const minutes = String(postDate.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}`;
-  } else {
-    const month = String(postDate.getMonth() + 1).padStart(2, "0");
-    const day = String(postDate.getDate()).padStart(2, "0");
-    return `${month}-${day}`;
-  }
+function isValidId(id) {
+  return mongoose.isValidObjectId(id);
 }
 
-// ----------------------
-// 전체 게시글 조회
-// ----------------------
+function formatPostDate(createdAt) {
+  const postDate = dayjs(createdAt);
+  const now = dayjs();
+  return postDate.isSame(now, "day") ? postDate.format("HH:mm") : postDate.format("MM-DD");
+}
+
+function formatComment(comment) {
+  const raw = typeof comment.toObject === "function" ? comment.toObject() : comment;
+  return {
+    ...raw,
+    createdAt: dayjs(raw.createdAt).format("YYYY-MM-DD HH:mm:ss"),
+  };
+}
+
+function getViewerKey(req) {
+  if (req.user?.userId) {
+    return { type: "user", userId: req.user.userId };
+  }
+
+  return {
+    type: "guest",
+    ip: req.ip,
+    userAgent: req.get("user-agent") || "",
+  };
+}
+
+function hasViewed(viewLogs, viewerKey) {
+  if (viewerKey.type === "user") {
+    return viewLogs.some((log) => log.userId === viewerKey.userId);
+  }
+
+  return viewLogs.some((log) => log.ip === viewerKey.ip && log.userAgent === viewerKey.userAgent);
+}
+
+// 게시글 목록
 router.get("/", async (req, res) => {
   try {
-    const posts = await Post.find().sort({ isNotice: -1, number: -1 });
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), MAX_PAGE_SIZE);
+    const skip = (page - 1) * limit;
 
-    const formattedPosts = posts.map((post) => ({
-      ...post.toObject(),
+    const [posts, total] = await Promise.all([
+      Post.find()
+        .sort({ isNotice: -1, number: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select("number title author category comments recommend isNotice views createdAt")
+        .lean(),
+      Post.countDocuments(),
+    ]);
+
+    const items = posts.map((post) => ({
+      ...post,
+      commentCount: post.comments?.length || 0,
+      comments: undefined,
       date: formatPostDate(post.createdAt),
     }));
 
-    res.json(formattedPosts);
+    res.json({ items, total, page, limit });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 
-// ----------------------
 // 게시글 작성
-// ----------------------
 router.post("/", verifyToken, async (req, res) => {
-  const { title, content, category } = req.body;
-  // console.log("확인", title, "2:", content, "3:", author);
+  const title = req.body.title?.trim();
+  const content = req.body.content?.trim();
+  const category = req.body.category?.trim() || DEFAULT_CATEGORY;
 
   if (!title || !content) {
-    return res.status(400).json({ message: "필수 값이 누락되었습니다." });
+    return res.status(400).json({ message: messages.requiredFields });
   }
 
   try {
-    // Counter로 number 자동 증가
-    const counter = await Counter.findByIdAndUpdate(
-      "post", // Counter 문서 id
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true },
-    );
-    const number = counter.seq;
+    const counter = await Counter.findByIdAndUpdate("post", { $inc: { seq: 1 } }, { new: true, upsert: true });
 
     const newPost = await Post.create({
-      number,
+      number: counter.seq,
       title,
       content,
-      category: category || "자유",
+      category,
       author: req.user.userName,
       userId: req.user.userId,
     });
@@ -113,162 +150,166 @@ router.post("/", verifyToken, async (req, res) => {
     res.status(201).json(newPost);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 
-//게시글 수정
+// 게시글 수정
 router.put("/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { title, content, category } = req.body;
+  const title = req.body.title?.trim();
+  const content = req.body.content?.trim();
+  const category = req.body.category?.trim();
 
-  if (!title || !content) {
-    return res.status(400).json({ message: "필수 값이 누락되었습니다." });
-  }
+  if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
+  if (!title || !content) return res.status(400).json({ message: messages.requiredFields });
 
   try {
     const post = await Post.findById(id);
+    if (!post) return res.status(404).json({ message: messages.postNotFound });
 
-    if (!post) {
-      return res.status(404).json({ message: "게시글이 존재하지 않습니다." });
-    }
-
-    if (post.userId?.toString() !== req.user.userId) {
-      return res.status(403).json({ message: "수정 권한이 없습니다." });
+    if (post.userId !== req.user.userId) {
+      return res.status(403).json({ message: messages.editForbidden });
     }
 
     post.title = title;
     post.content = content;
-    post.category = category || post.category || "자유";
+    post.category = category || post.category || DEFAULT_CATEGORY;
 
     await post.save();
-
     res.status(200).json(post);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 
-//게시글 상세보기
+// 게시글 상세
 router.get("/:id", optionalVerifyToken, async (req, res) => {
   const { id } = req.params;
-  const user = req.user;
+
+  if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
 
   try {
     const post = await Post.findById(id);
-    if (!post) {
-      return res.status(404).json({ message: "게시글을 찾을 수 없습니다." });
+    if (!post) return res.status(404).json({ message: messages.postNotFound });
+
+    const viewerKey = getViewerKey(req);
+    if (!hasViewed(post.viewLogs, viewerKey)) {
+      post.views += 1;
+      post.viewLogs.push({
+        userId: viewerKey.userId,
+        ip: viewerKey.ip,
+        userAgent: viewerKey.userAgent,
+      });
+      await post.save();
     }
 
-    if (req.user) {
-      const alreadyViewed = post.viewLogs.some((log) => log.userId === user.userId);
-      console.log(alreadyViewed);
-
-      if (!alreadyViewed) {
-        post.views += 1;
-        post.viewLogs.push({
-          userId: user.userId,
-        });
-        await post.save();
-      }
-    }
     const formattedPost = {
       ...post.toObject(),
       createdAt: dayjs(post.createdAt).format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: dayjs(post.updatedAt).format("YYYY-MM-DD HH:mm:ss"),
     };
 
     res.json(formattedPost);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
-//게시글 삭제
+
+// 게시글 삭제
 router.delete("/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
 
+  if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
+
   try {
     const post = await Post.findById(id);
-    if (!post) return res.status(404).json({ message: "게시글이 존재하지 않습니다." });
+    if (!post) return res.status(404).json({ message: messages.postNotFound });
 
-    if (post.userId?.toString() !== req.user.userId && !req.user.admin) {
-      return res.status(403).json({ message: "삭제 권한이 없습니다." });
+    if (post.userId !== req.user.userId && !req.user.admin) {
+      return res.status(403).json({ message: messages.deleteForbidden });
     }
 
     await post.deleteOne();
-    res.json({ message: "게시글이 삭제되었습니다." });
+    res.json({ message: messages.postDeleted });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 
-//댓글 달기
+// 댓글 작성
 router.post("/:id/comment", verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { content } = req.body;
+  const content = req.body.content?.trim();
 
-  if (!content) {
-    return res.status(400).json({ message: "내용을 작성해 주세요." });
-  }
+  if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
+  if (!content) return res.status(400).json({ message: messages.commentRequired });
 
   try {
     const post = await Post.findById(id);
-    if (!post) return res.status(404).json({ message: "게시글이 없습니다." });
+    if (!post) return res.status(404).json({ message: messages.postNotFound });
 
-    post.comments.push({ author: req.user.userName, content, userId: req.user.userId });
+    post.comments.push({
+      author: req.user.userName,
+      content,
+      userId: req.user.userId,
+    });
     await post.save();
 
-    res.status(201).json(post.comments);
+    const latestComment = post.comments[post.comments.length - 1];
+    res.status(201).json(formatComment(latestComment));
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 
-//댓글 보기
+// 댓글 목록
 router.get("/:id/comments", async (req, res) => {
   const { id } = req.params;
 
+  if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
+
   try {
-    const post = await Post.findById(id);
-    if (!post) return res.status(404).json({ message: "게시글이 없습니다." });
+    const post = await Post.findById(id).select("comments");
+    if (!post) return res.status(404).json({ message: messages.postNotFound });
 
-    const comments = post.comments.map((comment) => ({
-      ...comment.toObject(),
-      createdAt: dayjs(comment.createdAt).format("YYYY-MM-DD HH:mm:ss"),
-    }));
-
-    res.status(201).json(comments);
+    const comments = post.comments.map(formatComment);
+    res.status(200).json(comments);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 
-//댓글 삭제
+// 댓글 삭제
 router.delete("/:postId/comment/:commentId", verifyToken, async (req, res) => {
   const { postId, commentId } = req.params;
 
+  if (!isValidId(postId)) return res.status(400).json({ message: messages.invalidPostId });
+  if (!isValidId(commentId)) return res.status(400).json({ message: messages.invalidCommentId });
+
   try {
     const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "게시글이 존재하지 않습니다." });
+    if (!post) return res.status(404).json({ message: messages.postNotFound });
 
     const comment = post.comments.id(commentId);
-    if (!comment) return res.status(404).json({ message: "댓글이 존재하지 않습니다." });
+    if (!comment) return res.status(404).json({ message: messages.commentNotFound });
 
-    if (comment.userId?.toString() !== req.user.userId && !req.user.admin) {
-      return res.status(403).json({ message: "삭제 권한이 없습니다." });
+    if (comment.userId !== req.user.userId && !req.user.admin) {
+      return res.status(403).json({ message: messages.deleteForbidden });
     }
 
-    await comment.deleteOne();
+    post.comments.pull(commentId);
     await post.save();
 
-    res.status(200).json({ message: "댓글이 삭제되었습니다." });
+    res.status(200).json({ message: messages.commentDeleted });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "서버 오류" });
+    res.status(500).json({ message: messages.serverError });
   }
 });
 

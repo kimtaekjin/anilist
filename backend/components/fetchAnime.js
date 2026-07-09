@@ -12,6 +12,7 @@ const MAX_PAGE_CONCURRENCY = 3;
 const REQUEST_DELAY = 1000;
 const SINGLE_BATCH_TYPES = ["trending", "completed", "ova"];
 const MAX_PAGE_BATCHES_BY_TYPE = {
+  genre: Number(process.env.ANIME_GENRE_MAX_PAGE_BATCHES || 1),
   upcoming: Number(process.env.ANIME_UPCOMING_MAX_PAGE_BATCHES || 1),
 };
 const STOP_SYNC_STATUSES = [401, 403];
@@ -60,6 +61,7 @@ export async function fetchAnime(query, type, body = {}) {
     season: (body.season || defaultSeason).toUpperCase(),
     year: body.year || year,
   };
+  const skipTitleTranslation = body.skipTitleTranslation ?? type === "genre";
 
   async function fetchPage(pageNumber, retryCount = 0) {
     try {
@@ -162,9 +164,11 @@ export async function fetchAnime(query, type, body = {}) {
       ? await limitConcurrency(anime.genres, MAX_CONCURRENT_TRANSLATIONS, localizeGenre)
       : [];
 
-    const title = anime.title?.native
-      ? await translateItem(anime.title.native).catch(() => anime.title?.romaji || "")
-      : anime.title?.romaji || "";
+    const sourceTitle = anime.title?.native || anime.title?.romaji || anime.title?.english || "";
+    const title =
+      !skipTitleTranslation && anime.title?.native
+        ? await translateItem(anime.title.native).catch(() => anime.title?.romaji || sourceTitle)
+        : sourceTitle;
 
     return {
       _id: anime.id,
@@ -204,17 +208,25 @@ export async function fetchAnime(query, type, body = {}) {
 
   const media = await limitConcurrency(filteredMedia, MAX_CONCURRENT_TRANSLATIONS, processAnime);
 
-  await limitConcurrency(media, MAX_CONCURRENT_DB_UPDATES, async (anime) => {
+  if (media.length) {
     try {
-      return await Anime.updateOne(
-        { _id: anime._id },
-        { $set: anime, $addToSet: { contentTypes: type } },
-        { upsert: true, runValidators: true },
+      await Anime.bulkWrite(
+        media.map((anime) => ({
+          updateOne: {
+            filter: { _id: anime._id },
+            update: {
+              $set: anime,
+              $addToSet: { contentTypes: type },
+            },
+            upsert: true,
+          },
+        })),
+        { ordered: false },
       );
     } catch (error) {
-      console.error(`DB update failed for anime _id: ${anime._id}`, error);
+      console.error(`[${type}] bulk DB update failed:`, error);
     }
-  });
+  }
 
   return media;
 }

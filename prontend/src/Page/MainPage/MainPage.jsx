@@ -1,28 +1,23 @@
 import { useEffect, useState } from "react";
-import { fetchAniList } from "../../Components/items/AniListItem";
+import { fetchHomeAnime, getCachedHomeAnime } from "../../Components/items/AniListItem";
 import MainPageCard from "./MainPageCard";
 
-const getAnimeId = (anime) => anime?._id ?? anime?.id;
+const MAIN_PAGE_LIMIT = 30;
+const cachedHomeAnime = getCachedHomeAnime(MAIN_PAGE_LIMIT);
 
 const MainPage = () => {
-  const [trendingAnime, setTrendingAnime] = useState([]);
-  const [completedAnime, setCompletedAnime] = useState([]);
-  const [ovaAnime, setOvaAnime] = useState([]);
+  const [trendingAnime, setTrendingAnime] = useState(cachedHomeAnime?.trending || []);
+  const [completedAnime, setCompletedAnime] = useState(cachedHomeAnime?.completed || []);
+  const [ovaAnime, setOvaAnime] = useState(cachedHomeAnime?.ova || []);
 
   useEffect(() => {
     const fetchAnime = async () => {
       try {
-        const [trending, ovaAni] = await Promise.all([fetchAniList("trending"), fetchAniList("ova")]);
-        const trendingList = trending || [];
-        const trendingIds = trendingList.map(getAnimeId).filter(Boolean).join(",");
+        const homeAnime = await fetchHomeAnime(MAIN_PAGE_LIMIT);
 
-        const completed = await fetchAniList("completed", undefined, undefined, {
-          exclude: trendingIds,
-        });
-
-        setTrendingAnime(trendingList);
-        setCompletedAnime(completed || []);
-        setOvaAnime(ovaAni || []);
+        setTrendingAnime(homeAnime?.trending || []);
+        setCompletedAnime(homeAnime?.completed || []);
+        setOvaAnime(homeAnime?.ova || []);
       } catch (err) {
         console.error(err);
       }

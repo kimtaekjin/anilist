@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Building, Calendar, Search, SlidersHorizontal } from "lucide-react";
 import Select from "react-select";
 import Pagination from "../../Components/Pagination/Pagination";
-import { fetchAniList } from "../../Components/items/AniListItem.jsx";
+import { fetchAniList, getCachedAniList } from "../../Components/items/AniListItem.jsx";
 import { GenreSkeleton } from "../../Components/items/Skeleton";
 
 const genresList = ["액션", "로맨스", "판타지", "SF", "일상", "스포츠", "모험", "코미디", "드라마", "미스터리"];
@@ -116,19 +116,25 @@ const getCurrentSeason = () => {
 const GenreSection = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const initialSeason = searchParams.get("season") || getCurrentSeason();
+  const initialYear = Number(searchParams.get("year")) || currentYear;
+  const initialCache = getCachedAniList("genre", initialSeason, initialYear) || [];
+
   const [selectedGenres, setSelectedGenres] = useState(searchParams.get("genres")?.split(",") || []);
-  const [selectedSeason, setSelectedSeason] = useState(searchParams.get("season") || getCurrentSeason());
-  const [selectedYear, setSelectedYear] = useState(Number(searchParams.get("year")) || currentYear);
+  const [selectedSeason, setSelectedSeason] = useState(initialSeason);
+  const [selectedYear, setSelectedYear] = useState(initialYear);
   const [selectedName, setSelectedName] = useState(searchParams.get("name") ?? "");
-  const [animeList, setAnimeList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [animeList, setAnimeList] = useState(initialCache);
+  const [isLoading, setIsLoading] = useState(initialCache.length === 0);
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedName, setDebouncedName] = useState(searchParams.get("name") ?? "");
   const itemsPerPage = 12;
 
   useEffect(() => {
     const fetchAnime = async () => {
-      setIsLoading(true);
+      const cached = getCachedAniList("genre", selectedSeason, selectedYear) || [];
+      setAnimeList(cached);
+      setIsLoading(cached.length === 0);
       setCurrentPage(1);
 
       try {
@@ -265,7 +271,7 @@ const GenreSection = () => {
       {!isLoading && currentItems.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
-            {currentItems.map((anime) => (
+            {currentItems.map((anime, index) => (
               <button
                 key={anime._id}
                 type="button"
@@ -277,6 +283,8 @@ const GenreSection = () => {
                     src={anime.image?.large}
                     alt={anime.title}
                     className="h-52 w-full object-cover transition duration-500 group-hover:scale-105"
+                    loading={index < 8 ? "eager" : "lazy"}
+                    decoding="async"
                   />
                 </div>
                 <div className="p-4">

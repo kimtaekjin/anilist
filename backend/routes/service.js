@@ -13,8 +13,9 @@ router.use(express.json());
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
 const SUPPORTED_LIST_TYPES = ["trending", "completed", "ova", "airing", "genre", "upcoming"];
 const MIN_LIST_ITEMS = Number(process.env.ANIME_MIN_LIST_ITEMS || 20);
-const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS || 600);
-const DETAIL_CACHE_TTL_SECONDS = Number(process.env.ANIME_DETAIL_CACHE_TTL_SECONDS || 600);
+const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS || 60 * 60 * 24);
+const DETAIL_CACHE_TTL_SECONDS = Number(process.env.ANIME_DETAIL_CACHE_TTL_SECONDS || 60 * 60 * 24);
+const MAX_RESPONSE_LIMIT = 30;
 const RESPONSE_CACHE_VERSION = "deepl-ko-v1";
 const listFetchLocks = new Map();
 
@@ -110,6 +111,16 @@ function filterExcludedAnime(data, excludedIds) {
   return data.filter((anime) => !excludedSet.has(Number(anime._id)));
 }
 
+function getResponseLimit(query) {
+  const limit = Number(query.limit);
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return Math.min(Math.floor(limit), MAX_RESPONSE_LIMIT);
+}
+
+function limitAnimeList(data, limit) {
+  return limit ? data.slice(0, limit) : data;
+}
+
 function getListSort(type) {
   if (type === "completed") {
     return { averageScore: -1, popularity: -1 };
@@ -141,14 +152,14 @@ function isLikelyUntranslatedTitle(anime) {
   return Boolean(anime.originalTitle?.native || anime.originalTitle?.romaji || anime.originalTitle?.english);
 }
 
-async function localizeAnimeForResponse(anime) {
+async function localizeAnimeForResponse(anime, options = {}) {
   const item = anime.toObject ? anime.toObject() : { ...anime };
 
   item.genres = Array.isArray(item.genres)
     ? await Promise.all(item.genres.map((genre) => localizeGenre(genre)))
     : [];
 
-  if (isLikelyUntranslatedTitle(item)) {
+  if (!options.skipTitleTranslation && isLikelyUntranslatedTitle(item)) {
     const sourceTitle = item.originalTitle?.native || item.originalTitle?.romaji || item.title;
     item.title = await translateItem(sourceTitle).catch(() => item.title);
   }
@@ -160,8 +171,79 @@ async function localizeAnimeForResponse(anime) {
   return item;
 }
 
-async function localizeListForResponse(data) {
-  return Promise.all(data.map((anime) => localizeAnimeForResponse(anime)));
+async function localizeListForResponse(data, options = {}) {
+  return Promise.all(data.map((anime) => localizeAnimeForResponse(anime, options)));
+}
+
+async function getListDataForResponse(type, options = {}) {
+  const normalizedQuery = options.normalizedQuery || {};
+  const excludedIds = options.excludedIds || [];
+  const responseLimit = options.limit || null;
+  const localizeOptions = {
+    skipTitleTranslation: type === "genre",
+  };
+  const cacheKey = getListCacheKey(type, normalizedQuery);
+  const dbFilter = getListDbFilter(type, normalizedQuery);
+  const sort = getListSort(type);
+  const cached = redis.isOpen ? await redis.get(cacheKey) : null;
+
+  if (cached) {
+    const cachedData = readResponseCachePayload(cached);
+    const filteredCachedData = Array.isArray(cachedData) ? filterExcludedAnime(cachedData, excludedIds) : null;
+    if (Array.isArray(filteredCachedData) && filteredCachedData.length > 0) {
+      console.log(`Redis HIT ${cacheKey}`);
+      return limitAnimeList(filteredCachedData, responseLimit);
+    }
+
+    const legacyCachedData = safeJsonParse(cached);
+    const filteredLegacyCachedData = Array.isArray(legacyCachedData)
+      ? filterExcludedAnime(legacyCachedData, excludedIds)
+      : null;
+    if (Array.isArray(filteredLegacyCachedData) && filteredLegacyCachedData.length > 0) {
+      console.log(`Redis HIT legacy ${cacheKey}`);
+      const limitedLegacyData = limitAnimeList(filteredLegacyCachedData, responseLimit);
+      return localizeListForResponse(limitedLegacyData, localizeOptions);
+    }
+  }
+
+  const dbQueryLimit = responseLimit ? responseLimit + excludedIds.length : 0;
+  let dbQuery = Anime.find(dbFilter).sort(sort);
+  if (dbQueryLimit) {
+    dbQuery = dbQuery.limit(dbQueryLimit);
+  }
+
+  let data = await dbQuery.lean();
+  let responseData = filterExcludedAnime(data, excludedIds);
+  const shouldFetchMore = responseLimit ? responseData.length === 0 : data.length < MIN_LIST_ITEMS;
+
+  if (shouldFetchMore) {
+    try {
+      await fetchListWithLock(cacheKey, queries[type], type, normalizedQuery);
+      const fullData = await Anime.find(dbFilter).sort(sort).lean();
+      responseData = filterExcludedAnime(fullData, excludedIds);
+      data = dbQueryLimit ? fullData.slice(0, dbQueryLimit) : fullData;
+
+      if (redis.isOpen && !excludedIds.length) {
+        const fullLocalizedData = await localizeListForResponse(fullData, localizeOptions);
+        await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(fullLocalizedData));
+      }
+    } catch (error) {
+      if (!responseData.length) {
+        throw error;
+      }
+
+      console.error(`[${type}] AniList fetch failed, returning DB data:`, error);
+    }
+  }
+
+  const limitedData = limitAnimeList(responseData, responseLimit);
+  const localizedData = await localizeListForResponse(limitedData, localizeOptions);
+
+  if (redis.isOpen && !excludedIds.length && !responseLimit) {
+    await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
+  }
+
+  return localizedData;
 }
 
 async function fetchDetail(query, type, id) {
@@ -318,6 +400,48 @@ router.get("/anime/detail/:id", async (req, res) => {
   }
 });
 
+router.get("/anime/home", async (req, res) => {
+  const responseLimit = getResponseLimit(req.query) || MAX_RESPONSE_LIMIT;
+  const homeCacheKey = `anime:home:limit=${responseLimit}`;
+
+  try {
+    if (redis.isOpen) {
+      const cached = await redis.get(homeCacheKey);
+      const cachedData = cached ? readResponseCachePayload(cached) : null;
+      if (cachedData) {
+        console.log(`Redis HIT ${homeCacheKey}`);
+        return res.json(cachedData);
+      }
+    }
+
+    const [trending, ova] = await Promise.all([
+      getListDataForResponse("trending", { limit: responseLimit }),
+      getListDataForResponse("ova", { limit: responseLimit }),
+    ]);
+
+    const trendingIds = trending.map((anime) => Number(anime._id)).filter((id) => Number.isInteger(id));
+    const completed = await getListDataForResponse("completed", {
+      excludedIds: trendingIds,
+      limit: responseLimit,
+    });
+
+    const homeData = {
+      trending,
+      completed,
+      ova,
+    };
+
+    if (redis.isOpen) {
+      await redis.setEx(homeCacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(homeData));
+    }
+
+    return res.json(homeData);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "서버 오류" });
+  }
+});
+
 router.get("/anime/:type", async (req, res) => {
   const type = normalizeAnimeType(req.params.type);
 
@@ -328,70 +452,14 @@ router.get("/anime/:type", async (req, res) => {
 
     const normalizedQuery = normalizeListQuery(type, req.query);
     const excludedIds = getExcludedAnimeIds(req.query);
-    const cacheKey = getListCacheKey(type, normalizedQuery);
-    const dbFilter = getListDbFilter(type, normalizedQuery);
-    const sort = getListSort(type);
-    const cached = redis.isOpen ? await redis.get(cacheKey) : null;
+    const responseLimit = getResponseLimit(req.query);
+    const data = await getListDataForResponse(type, {
+      normalizedQuery,
+      excludedIds,
+      limit: responseLimit,
+    });
 
-    if (cached) {
-      const cachedData = readResponseCachePayload(cached);
-      const filteredCachedData = Array.isArray(cachedData) ? filterExcludedAnime(cachedData, excludedIds) : null;
-      if (
-        Array.isArray(filteredCachedData) &&
-        (filteredCachedData.length >= MIN_LIST_ITEMS || (excludedIds.length && cachedData.length >= MIN_LIST_ITEMS))
-      ) {
-        console.log(`Redis HIT ${cacheKey}`);
-        return res.json(filteredCachedData);
-      }
-
-      const legacyCachedData = safeJsonParse(cached);
-      const filteredLegacyCachedData = Array.isArray(legacyCachedData)
-        ? filterExcludedAnime(legacyCachedData, excludedIds)
-        : null;
-      if (
-        Array.isArray(filteredLegacyCachedData) &&
-        (filteredLegacyCachedData.length >= MIN_LIST_ITEMS ||
-          (excludedIds.length && legacyCachedData.length >= MIN_LIST_ITEMS))
-      ) {
-        console.log(`Redis HIT legacy ${cacheKey}`);
-        const localizedLegacyData = await localizeListForResponse(filteredLegacyCachedData);
-        if (redis.isOpen) {
-          const refreshedLegacyData = await localizeListForResponse(legacyCachedData);
-          await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(refreshedLegacyData));
-        }
-        return res.json(localizedLegacyData);
-      }
-
-      console.log(`Redis HIT but insufficient ${cacheKey}`);
-    }
-
-    console.log(`Redis MISS ${cacheKey}`);
-
-    let data = await Anime.find(dbFilter).sort(sort).lean();
-    let responseData = filterExcludedAnime(data, excludedIds);
-    const shouldFetchMore = data.length < MIN_LIST_ITEMS || (!excludedIds.length && responseData.length < MIN_LIST_ITEMS);
-
-    if (shouldFetchMore) {
-      try {
-        await fetchListWithLock(cacheKey, queries[type], type, normalizedQuery);
-        data = await Anime.find(dbFilter).sort(sort).lean();
-        responseData = filterExcludedAnime(data, excludedIds);
-      } catch (error) {
-        if (!responseData.length) {
-          throw error;
-        }
-
-        console.error(`[${type}] AniList fetch failed, returning DB data:`, error);
-      }
-    }
-
-    const localizedData = await localizeListForResponse(responseData);
-
-    if (redis.isOpen && !excludedIds.length) {
-      await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
-    }
-
-    return res.json(localizedData);
+    return res.json(data);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "서버 오류" });

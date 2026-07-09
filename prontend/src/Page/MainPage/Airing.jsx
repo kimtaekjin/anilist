@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarDays, Tv } from "lucide-react";
-import { fetchAniList } from "../../Components/items/AniListItem.jsx";
+import { fetchAniList, getCachedAniList } from "../../Components/items/AniListItem.jsx";
 import { AiringSkeleton } from "../../Components/items/Skeleton";
 
 const days = ["전체", "일", "월", "화", "수", "목", "금", "토"];
+const cachedAiring = getCachedAniList("airing") || [];
 
 function normalizeDay(day) {
   return days.includes(day) ? day : "";
 }
 
 const Airing = () => {
-  const [animeList, setAnimeList] = useState([]);
+  const [animeList, setAnimeList] = useState(cachedAiring);
   const [selectedDay, setSelectedDay] = useState("전체");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(cachedAiring.length === 0);
 
   const navigate = useNavigate();
 
@@ -67,7 +68,7 @@ const Airing = () => {
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
         {isLoading
           ? Array.from({ length: 8 }).map((_, i) => <AiringSkeleton key={i} />)
-          : filteredList.map((anime) => {
+          : filteredList.map((anime, index) => {
               const day = normalizeDay(anime.days);
 
               return (
@@ -82,6 +83,8 @@ const Airing = () => {
                       src={anime.image?.large}
                       alt={anime.title}
                       className="h-48 w-full object-cover transition duration-500 group-hover:scale-105"
+                      loading={index < 8 ? "eager" : "lazy"}
+                      decoding="async"
                     />
                   </div>
                   <div className="p-4">

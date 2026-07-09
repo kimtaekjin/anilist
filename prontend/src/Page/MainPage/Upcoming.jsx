@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Building, CalendarDays, Clapperboard, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchAniList } from "../../Components/items/AniListItem.jsx";
+import { fetchAniList, getCachedAniList } from "../../Components/items/AniListItem.jsx";
 import { UpcommingSkeleton } from "../../Components/items/Skeleton";
 import Pagination from "../../Components/Pagination/Pagination.jsx";
 
+const cachedUpcoming = getCachedAniList("upcoming") || [];
+
 const Upcoming = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [animeList, setAnimeList] = useState([]);
+  const [isLoading, setIsLoading] = useState(cachedUpcoming.length === 0);
+  const [animeList, setAnimeList] = useState(cachedUpcoming);
   const [searchName, setSearchName] = useState("");
   const navigate = useNavigate();
 
@@ -16,7 +18,6 @@ const Upcoming = () => {
 
   useEffect(() => {
     const fetchUpcomingAnime = async () => {
-      setIsLoading(true);
       setCurrentPage(1);
 
       try {
@@ -86,7 +87,7 @@ const Upcoming = () => {
       {!isLoading && filteredList.length > 0 && (
         <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {currentItems.map((anime) => {
+            {currentItems.map((anime, index) => {
               const genres = Array.isArray(anime.genres) ? anime.genres : [];
               const studio = Array.isArray(anime.studio) ? anime.studio[0] : anime.studio;
 
@@ -103,6 +104,8 @@ const Upcoming = () => {
                         src={anime.image.large}
                         alt={anime.title}
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        loading={index < 6 ? "eager" : "lazy"}
+                        decoding="async"
                       />
                     </div>
                   )}

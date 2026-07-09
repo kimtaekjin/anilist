@@ -14,7 +14,7 @@ const TRANSLATION_ENDPOINT =
     : "https://api.deepl.com/v2/translate");
 const REQUEST_INTERVAL_MS = Number(process.env.TRANSLATION_REQUEST_INTERVAL_MS || 1500);
 const DEFAULT_COOLDOWN_MS = 1000 * 60;
-const REDIS_CACHE_TTL_SECONDS = Number(process.env.TRANSLATION_REDIS_TTL_SECONDS || 60 * 60 * 24 * 30);
+const REDIS_CACHE_TTL_SECONDS = Number(process.env.TRANSLATION_REDIS_TTL_SECONDS || 60 * 60 * 24);
 
 let lastTranslationRequestAt = 0;
 let translationCooldownUntil = 0;

@@ -8,6 +8,16 @@ import nodemailer from "nodemailer";
 
 router.use(express.json());
 
+const getAuthCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === "production";
+
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "strict",
+  };
+};
+
 // 회원가입
 router.post("/signup", async (req, res) => {
   try {
@@ -73,12 +83,8 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(authUser, process.env.JWT_SECRET, {
       expiresIn: "24h",
     });
-    const isProd = process.env.NODE_ENV === "production";
-
     res.cookie("token", token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "none" : "strict",
+      ...getAuthCookieOptions(),
       maxAge: 24 * 60 * 60 * 1000, // 24시간
     });
 
@@ -110,11 +116,7 @@ router.post("/logout", async (req, res) => {
       console.error("토큰 검증 오류:", error.message);
     }
 
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: false,
-      sameSite: "strict",
-    });
+    res.clearCookie("token", getAuthCookieOptions());
 
     res.json({ message: "로그아웃되었습니다." });
   } catch (error) {

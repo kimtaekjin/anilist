@@ -17,7 +17,31 @@ const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS |
 const DETAIL_CACHE_TTL_SECONDS = Number(process.env.ANIME_DETAIL_CACHE_TTL_SECONDS || 60 * 60 * 24);
 const MAX_RESPONSE_LIMIT = 30;
 const RESPONSE_CACHE_VERSION = "deepl-ko-v1";
+const ANILIST_REQUEST_TIMEOUT_MS = Number(process.env.ANILIST_REQUEST_TIMEOUT_MS || 10000);
 const listFetchLocks = new Map();
+
+async function readRedisCache(key) {
+  if (!redis.isOpen) return null;
+
+  try {
+    return await redis.get(key);
+  } catch (error) {
+    console.error(`Redis GET failed (${key}):`, error.message);
+    return null;
+  }
+}
+
+async function writeRedisCache(key, ttlSeconds, value) {
+  if (!redis.isOpen) return false;
+
+  try {
+    await redis.setEx(key, ttlSeconds, value);
+    return true;
+  } catch (error) {
+    console.error(`Redis SET failed (${key}):`, error.message);
+    return false;
+  }
+}
 
 function normalizeAnimeType(type) {
   return type === "upcomming" ? "upcoming" : type;
@@ -185,7 +209,7 @@ async function getListDataForResponse(type, options = {}) {
   const cacheKey = getListCacheKey(type, normalizedQuery);
   const dbFilter = getListDbFilter(type, normalizedQuery);
   const sort = getListSort(type);
-  const cached = redis.isOpen ? await redis.get(cacheKey) : null;
+  const cached = await readRedisCache(cacheKey);
 
   if (cached) {
     const cachedData = readResponseCachePayload(cached);
@@ -225,7 +249,7 @@ async function getListDataForResponse(type, options = {}) {
 
       if (redis.isOpen && !excludedIds.length) {
         const fullLocalizedData = await localizeListForResponse(fullData, localizeOptions);
-        await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(fullLocalizedData));
+        await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(fullLocalizedData));
       }
     } catch (error) {
       if (!responseData.length) {
@@ -240,7 +264,7 @@ async function getListDataForResponse(type, options = {}) {
   const localizedData = await localizeListForResponse(limitedData, localizeOptions);
 
   if (redis.isOpen && !excludedIds.length && !responseLimit) {
-    await redis.setEx(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
+    await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
   }
 
   return localizedData;
@@ -257,6 +281,7 @@ async function fetchDetail(query, type, id) {
       query,
       variables: { id: Number(id) },
     }),
+    signal: AbortSignal.timeout(ANILIST_REQUEST_TIMEOUT_MS),
   });
 
   const res = await response.json();
@@ -361,7 +386,7 @@ router.get("/anime/detail/:id", async (req, res) => {
     }
 
     if (redis.isOpen) {
-      const cached = await redis.get(detailCacheKey);
+      const cached = await readRedisCache(detailCacheKey);
       const cachedData = cached ? readResponseCachePayload(cached) : null;
       if (cachedData) {
         console.log(`Redis HIT ${detailCacheKey}`);
@@ -390,7 +415,7 @@ router.get("/anime/detail/:id", async (req, res) => {
     const localizedMedia = await localizeAnimeForResponse(media);
 
     if (redis.isOpen) {
-      await redis.setEx(detailCacheKey, DETAIL_CACHE_TTL_SECONDS, createResponseCachePayload(localizedMedia));
+      await writeRedisCache(detailCacheKey, DETAIL_CACHE_TTL_SECONDS, createResponseCachePayload(localizedMedia));
     }
 
     return res.status(200).json(localizedMedia);
@@ -406,7 +431,7 @@ router.get("/anime/home", async (req, res) => {
 
   try {
     if (redis.isOpen) {
-      const cached = await redis.get(homeCacheKey);
+      const cached = await readRedisCache(homeCacheKey);
       const cachedData = cached ? readResponseCachePayload(cached) : null;
       if (cachedData) {
         console.log(`Redis HIT ${homeCacheKey}`);
@@ -432,7 +457,7 @@ router.get("/anime/home", async (req, res) => {
     };
 
     if (redis.isOpen) {
-      await redis.setEx(homeCacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(homeData));
+      await writeRedisCache(homeCacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(homeData));
     }
 
     return res.json(homeData);

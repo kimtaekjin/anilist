@@ -1,9 +1,11 @@
 import express from "express";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import dayjs from "dayjs";
 import Post from "../models/Post.js";
 import Counter from "../models/PostCounter.js";
+import redis from "../config/redis.js";
 
 const router = express.Router();
 
@@ -11,6 +13,8 @@ router.use(express.json());
 
 const DEFAULT_CATEGORY = "자유";
 const MAX_PAGE_SIZE = 50;
+const MIN_POST_CONTENT_LENGTH = 10;
+const VIEW_DEDUP_TTL_SECONDS = Number(process.env.POST_VIEW_TTL_SECONDS || 60 * 60 * 24);
 
 const messages = {
   authRequired: "인증이 필요합니다.",
@@ -86,12 +90,28 @@ function getViewerKey(req) {
   };
 }
 
-function hasViewed(viewLogs, viewerKey) {
-  if (viewerKey.type === "user") {
-    return viewLogs.some((log) => log.userId === viewerKey.userId);
-  }
+function getViewCacheKey(postId, viewerKey) {
+  const identity =
+    viewerKey.type === "user"
+      ? `user:${viewerKey.userId}`
+      : `guest:${viewerKey.ip}:${viewerKey.userAgent}`;
+  const fingerprint = crypto.createHash("sha256").update(identity).digest("hex");
+  return `post:view:${postId}:${fingerprint}`;
+}
 
-  return viewLogs.some((log) => log.ip === viewerKey.ip && log.userAgent === viewerKey.userAgent);
+async function shouldIncrementView(postId, viewerKey) {
+  if (!redis.isOpen) return true;
+
+  try {
+    const result = await redis.set(getViewCacheKey(postId, viewerKey), "1", {
+      EX: VIEW_DEDUP_TTL_SECONDS,
+      NX: true,
+    });
+    return result === "OK";
+  } catch (error) {
+    console.error("Post view Redis check failed:", error.message);
+    return true;
+  }
 }
 
 // 게시글 목록
@@ -102,19 +122,29 @@ router.get("/", async (req, res) => {
     const skip = (page - 1) * limit;
 
     const [posts, total] = await Promise.all([
-      Post.find()
-        .sort({ isNotice: -1, number: -1 })
-        .skip(skip)
-        .limit(limit)
-        .select("number title author category comments recommend isNotice views createdAt")
-        .lean(),
+      Post.aggregate([
+        { $sort: { isNotice: -1, number: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            number: 1,
+            title: 1,
+            author: 1,
+            category: 1,
+            recommend: 1,
+            isNotice: 1,
+            views: 1,
+            createdAt: 1,
+            commentCount: { $size: { $ifNull: ["$comments", []] } },
+          },
+        },
+      ]),
       Post.countDocuments(),
     ]);
 
     const items = posts.map((post) => ({
       ...post,
-      commentCount: post.comments?.length || 0,
-      comments: undefined,
       date: formatPostDate(post.createdAt),
     }));
 
@@ -131,7 +161,7 @@ router.post("/", verifyToken, async (req, res) => {
   const content = req.body.content?.trim();
   const category = req.body.category?.trim() || DEFAULT_CATEGORY;
 
-  if (!title || !content) {
+  if (!title || !content || content.length < MIN_POST_CONTENT_LENGTH) {
     return res.status(400).json({ message: messages.requiredFields });
   }
 
@@ -162,7 +192,9 @@ router.put("/:id", verifyToken, async (req, res) => {
   const category = req.body.category?.trim();
 
   if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
-  if (!title || !content) return res.status(400).json({ message: messages.requiredFields });
+  if (!title || !content || content.length < MIN_POST_CONTENT_LENGTH) {
+    return res.status(400).json({ message: messages.requiredFields });
+  }
 
   try {
     const post = await Post.findById(id);
@@ -191,22 +223,16 @@ router.get("/:id", optionalVerifyToken, async (req, res) => {
   if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
 
   try {
-    const post = await Post.findById(id);
+    const viewerKey = getViewerKey(req);
+    const incrementView = await shouldIncrementView(id, viewerKey);
+    const query = incrementView
+      ? Post.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true })
+      : Post.findById(id);
+    const post = await query.select("-comments -viewLogs").lean();
     if (!post) return res.status(404).json({ message: messages.postNotFound });
 
-    const viewerKey = getViewerKey(req);
-    if (!hasViewed(post.viewLogs, viewerKey)) {
-      post.views += 1;
-      post.viewLogs.push({
-        userId: viewerKey.userId,
-        ip: viewerKey.ip,
-        userAgent: viewerKey.userAgent,
-      });
-      await post.save();
-    }
-
     const formattedPost = {
-      ...post.toObject(),
+      ...post,
       createdAt: dayjs(post.createdAt).format("YYYY-MM-DD HH:mm:ss"),
       updatedAt: dayjs(post.updatedAt).format("YYYY-MM-DD HH:mm:ss"),
     };

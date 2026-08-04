@@ -27,31 +27,40 @@ const TEXT = {
 export default function PostWritePage() {
   const navigate = useNavigate();
   const API_URL = process.env.REACT_APP_CLIENT_URL;
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const { id } = useParams();
   const isEdit = Boolean(id);
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       alert(TEXT.loginRequired);
-      navigate("/");
+      navigate("/user/Login", { replace: true });
     }
-  }, [user, navigate]);
+  }, [loading, user, navigate]);
 
   useEffect(() => {
-    if (isEdit) {
-      axios.get(`${API_URL}/post/${id}`).then((res) => {
-        setTitle(res.data.title);
-        setContent(res.data.content);
-      });
+    if (isEdit && !loading && user) {
+      axios
+        .get(`${API_URL}/post/${id}`, { withCredentials: true })
+        .then((res) => {
+          setTitle(res.data.title);
+          setContent(res.data.content);
+        })
+        .catch(() => {
+          alert(TEXT.serverError);
+          navigate("/board", { replace: true });
+        });
     }
-  }, [isEdit, id, API_URL]);
+  }, [isEdit, id, API_URL, loading, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (submitting) return;
 
     if (!title.trim()) {
       alert(TEXT.titleRequired);
@@ -74,6 +83,7 @@ export default function PostWritePage() {
     };
 
     try {
+      setSubmitting(true);
       const res = isEdit
         ? await axios.put(`${API_URL}/post/${id}`, payload, { withCredentials: true })
         : await axios.post(`${API_URL}/post`, payload, { withCredentials: true });
@@ -88,6 +98,8 @@ export default function PostWritePage() {
       } else {
         alert(TEXT.serverError);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -135,9 +147,10 @@ export default function PostWritePage() {
 
             <button
               type="submit"
-              className="rounded-md bg-red-600 px-6 py-2 text-sm font-bold text-white transition hover:bg-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/20"
+              disabled={submitting}
+              className="rounded-md bg-red-600 px-6 py-2 text-sm font-bold text-white transition hover:bg-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {TEXT.submit}
+              {submitting ? "처리 중..." : TEXT.submit}
             </button>
           </div>
         </form>

@@ -10,6 +10,7 @@ const MAX_CONCURRENT_TRANSLATIONS = 1;
 const MAX_CONCURRENT_DB_UPDATES = 30;
 const MAX_PAGE_CONCURRENCY = 3;
 const REQUEST_DELAY = 1000;
+const ANILIST_REQUEST_TIMEOUT_MS = Number(process.env.ANILIST_REQUEST_TIMEOUT_MS || 10000);
 const SINGLE_BATCH_TYPES = ["trending", "completed", "ova"];
 const MAX_PAGE_BATCHES_BY_TYPE = {
   genre: Number(process.env.ANIME_GENRE_MAX_PAGE_BATCHES || 1),
@@ -75,6 +76,7 @@ export async function fetchAnime(query, type, body = {}) {
           query,
           variables: { ...variables, page: pageNumber },
         }),
+        signal: AbortSignal.timeout(ANILIST_REQUEST_TIMEOUT_MS),
       });
 
       const json = await response.json();

@@ -31,6 +31,9 @@ export default function PostDetailPage() {
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [comment, setComment] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
   const isAdmin = user?.admin === true;
 
   const fetchComments = useCallback(async () => {
@@ -39,19 +42,30 @@ export default function PostDetailPage() {
   }, [API_URL, id]);
 
   useEffect(() => {
-    const fetchPost = async () => {
-      const res = await axios.get(`${API_URL}/post/${id}`, {
-        withCredentials: true,
-      });
-      setPost(res.data);
+    const loadPost = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const [postResponse] = await Promise.all([
+          axios.get(`${API_URL}/post/${id}`, { withCredentials: true }),
+          fetchComments(),
+        ]);
+        setPost(postResponse.data);
+      } catch (requestError) {
+        console.error(requestError);
+        setError(requestError.response?.status === 404 ? "게시글을 찾을 수 없습니다." : TEXT.serverError);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchPost();
-    fetchComments();
+    loadPost();
   }, [id, API_URL, fetchComments]);
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
+
+    if (commentSubmitting) return;
 
     if (!user) {
       alert(TEXT.loginRequiredForComment);
@@ -64,6 +78,7 @@ export default function PostDetailPage() {
     }
 
     try {
+      setCommentSubmitting(true);
       const response = await axios.post(
         `${API_URL}/post/${id}/comment`,
         { content: comment.trim() },
@@ -81,6 +96,8 @@ export default function PostDetailPage() {
       } else {
         alert(TEXT.serverError);
       }
+    } finally {
+      setCommentSubmitting(false);
     }
   };
 
@@ -133,7 +150,9 @@ export default function PostDetailPage() {
     }
   };
 
-  if (!post) return <PostDetailSkeleton />;
+  if (loading) return <PostDetailSkeleton />;
+  if (error) return <p className="py-20 text-center text-red-300">{error}</p>;
+  if (!post) return null;
 
   const isAuthor = user && post.userId?.toString() === user.userId;
 
@@ -229,9 +248,10 @@ export default function PostDetailPage() {
             />
             <button
               type="submit"
-              className="rounded-md bg-red-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/20 sm:self-stretch"
+              disabled={commentSubmitting}
+              className="rounded-md bg-red-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 sm:self-stretch"
             >
-              {TEXT.submit}
+              {commentSubmitting ? "처리 중..." : TEXT.submit}
             </button>
           </form>
         </section>

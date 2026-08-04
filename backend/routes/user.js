@@ -145,7 +145,7 @@ router.get("/verify-token", (req, res) => {
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
   // const API_URL = process.env.CLIENT_URL ;
-  const API_URL = process.env.SERVER_URL;
+  const API_URL = process.env.CLIENT_URL || process.env.SERVER_URL;
 
   try {
     const user = await User.findOne({ email });

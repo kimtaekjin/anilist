@@ -40,6 +40,10 @@ app.get("/healthz", (req, res) => res.send("OK"));
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
+    app.listen(PORT, () => {
+      console.log("Server running on port:", PORT);
+    });
+
     console.log("MongoDB 연결 성공");
     if (process.env.ANIME_SYNC_ENABLED === "true") {
       startAnimeSync();
@@ -48,7 +52,3 @@ mongoose
     }
   })
   .catch((err) => console.error("MongoDB 연결 실패", err));
-
-app.listen(PORT, () => {
-  console.log("Server running on port:", PORT);
-});

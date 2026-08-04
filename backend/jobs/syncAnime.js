@@ -10,6 +10,19 @@ const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS |
 const RESPONSE_CACHE_VERSION = "deepl-ko-v1";
 const HOME_LIMIT = 30;
 const SEASONS = ["WINTER", "SPRING", "SUMMER", "FALL"];
+let activeSync = null;
+
+async function writeRedisCache(key, value) {
+  if (!redis.isOpen) return false;
+
+  try {
+    await redis.setEx(key, LIST_CACHE_TTL_SECONDS, value);
+    return true;
+  } catch (error) {
+    console.error(`Redis cache warm-up failed (${key}):`, error.message);
+    return false;
+  }
+}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -118,7 +131,7 @@ async function saveListCache(type) {
   const data = await getListFromDb(type);
   if (!data.length) return data;
 
-  await redis.setEx(getListCacheKey(type, getNormalizedQuery(type)), LIST_CACHE_TTL_SECONDS, createResponseCachePayload(data));
+  await writeRedisCache(getListCacheKey(type, getNormalizedQuery(type)), createResponseCachePayload(data));
   console.log(`[${type}] Redis 목록 캐시 저장: ${data.length}개`);
   return data;
 }
@@ -130,11 +143,7 @@ async function saveGenreCache(target) {
   const data = await getGenreListFromDb(normalizedQuery);
   if (!data.length) return data;
 
-  await redis.setEx(
-    getListCacheKey("genre", normalizedQuery),
-    LIST_CACHE_TTL_SECONDS,
-    createResponseCachePayload(data),
-  );
+  await writeRedisCache(getListCacheKey("genre", normalizedQuery), createResponseCachePayload(data));
   console.log(`[genre ${normalizedQuery.year} ${normalizedQuery.season}] Redis 목록 캐시 저장: ${data.length}개`);
   return data;
 }
@@ -164,7 +173,7 @@ async function warmHomeCache() {
     ova: ova.slice(0, HOME_LIMIT),
   };
 
-  await redis.setEx(`anime:home:limit=${HOME_LIMIT}`, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(homeData));
+  await writeRedisCache(`anime:home:limit=${HOME_LIMIT}`, createResponseCachePayload(homeData));
   console.log("[home] Redis 홈 캐시 저장");
 }
 
@@ -205,7 +214,7 @@ async function syncGenrePrecache(typeDelay) {
   }
 }
 
-export async function syncAll(options = {}) {
+async function runSync(options = {}) {
   const typeDelay = Number(options.typeDelayMs ?? process.env.ANIME_SYNC_TYPE_DELAY_MS ?? DEFAULT_TYPE_DELAY);
 
   console.log("애니 데이터 동기화 시작");
@@ -229,12 +238,28 @@ export async function syncAll(options = {}) {
   console.log("애니 데이터 동기화 종료");
 }
 
+export function syncAll(options = {}) {
+  if (activeSync) {
+    console.log("Anime sync is already running; skipping duplicate execution.");
+    return activeSync;
+  }
+
+  activeSync = runSync(options).finally(() => {
+    activeSync = null;
+  });
+
+  return activeSync;
+}
+
 export function startAnimeSync(options = {}) {
   const interval = Number(options.intervalMs ?? process.env.ANIME_SYNC_INTERVAL_MS ?? DEFAULT_INTERVAL);
   const startupDelay = Number(options.startupDelayMs ?? process.env.ANIME_SYNC_STARTUP_DELAY_MS ?? DEFAULT_STARTUP_DELAY);
 
-  const timeoutId = setTimeout(syncAll, startupDelay);
-  const intervalId = setInterval(syncAll, interval);
+  const runScheduledSync = () => {
+    syncAll().catch((error) => console.error("Scheduled anime sync failed:", error));
+  };
+  const timeoutId = setTimeout(runScheduledSync, startupDelay);
+  const intervalId = setInterval(runScheduledSync, interval);
 
   return {
     timeoutId,

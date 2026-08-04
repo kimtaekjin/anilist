@@ -28,12 +28,16 @@ const Board = () => {
   const [posts, setPosts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const itemsPerPage = 15;
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
+        setLoading(true);
+        setError("");
         const { data } = await axios.get(`${API_URL}/post`, {
           params: {
             page: currentPage,
@@ -45,6 +49,9 @@ const Board = () => {
         setTotalItems(Array.isArray(data) ? data.length : data.total || nextPosts.length);
       } catch (err) {
         console.error(err);
+        setError("게시글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -87,9 +94,13 @@ const Board = () => {
           <div className="col-span-1 hidden py-3 text-center lg:block">{TEXT.views}</div>
         </div>
 
-        {posts.length === 0 && <div className="py-16 text-center text-sm text-stone-400">{TEXT.empty}</div>}
+        {loading && <div className="py-16 text-center text-sm text-stone-400">불러오는 중...</div>}
+        {!loading && error && <div className="py-16 text-center text-sm text-red-300">{error}</div>}
+        {!loading && !error && posts.length === 0 && (
+          <div className="py-16 text-center text-sm text-stone-400">{TEXT.empty}</div>
+        )}
 
-        {posts.map((post, index) => {
+        {!loading && !error && posts.map((post, index) => {
           const commentCount = post.commentCount ?? post.comments?.length ?? 0;
           const displayNumber = post.isNotice ? TEXT.notice : totalItems - ((currentPage - 1) * itemsPerPage + index);
 

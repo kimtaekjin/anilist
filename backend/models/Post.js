@@ -15,7 +15,7 @@ const postSchema = new mongoose.Schema(
   {
     number: { type: Number, required: true, unique: true, index: true },
     title: { type: String, required: true, trim: true, maxlength: 30 },
-    content: { type: String, required: true, trim: true, maxlength: 10000 },
+    content: { type: String, required: true, trim: true, minlength: 10, maxlength: 10000 },
     author: { type: String, required: true, trim: true },
     userId: { type: String, required: true, index: true },
     category: { type: String, default: "자유", trim: true },

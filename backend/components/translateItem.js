@@ -13,6 +13,7 @@ const TRANSLATION_ENDPOINT =
     ? "https://api-free.deepl.com/v2/translate"
     : "https://api.deepl.com/v2/translate");
 const REQUEST_INTERVAL_MS = Number(process.env.TRANSLATION_REQUEST_INTERVAL_MS || 1500);
+const TRANSLATION_REQUEST_TIMEOUT_MS = Number(process.env.TRANSLATION_REQUEST_TIMEOUT_MS || 15000);
 const DEFAULT_COOLDOWN_MS = 1000 * 60;
 const REDIS_CACHE_TTL_SECONDS = Number(process.env.TRANSLATION_REDIS_TTL_SECONDS || 60 * 60 * 24);
 
@@ -153,6 +154,7 @@ export async function translate(text, source, target) {
         Authorization: `DeepL-Auth-Key ${DEEPL_AUTH_KEY}`,
       },
       body: JSON.stringify(buildDeepLRequestBody(text, source, target)),
+      signal: AbortSignal.timeout(TRANSLATION_REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) {

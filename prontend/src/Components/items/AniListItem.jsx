@@ -2,7 +2,8 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_CLIENT_URL;
 const BROWSER_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
-const CACHE_PREFIX = "aniwiki:anime";
+const CACHE_PREFIX = "aniwiki:anime:v2";
+let homeRequest = null;
 
 function isBrowser() {
   return typeof window !== "undefined" && Boolean(window.localStorage);
@@ -119,24 +120,34 @@ export const fetchAniList = async (type, selectedSeason, selectedYear, extraPara
 };
 
 export const fetchHomeAnime = async (limit = 30) => {
+  if (homeRequest) return homeRequest;
+
   const cacheKey = getHomeCacheKey(limit);
 
+  homeRequest = (async () => {
+    try {
+      const response = await axios.get(`${API_URL}/service/anime/home`, {
+        params: { limit },
+      });
+
+      const formatted = {
+        trending: formatAnimeList(response.data?.trending, "trending"),
+        completed: formatAnimeList(response.data?.completed, "completed"),
+        ova: formatAnimeList(response.data?.ova, "ova"),
+      };
+
+      writeCache(cacheKey, formatted);
+      return formatted;
+    } catch (error) {
+      console.error("error:", error);
+      return readCache(cacheKey) || { trending: [], completed: [], ova: [] };
+    }
+  })();
+
   try {
-    const response = await axios.get(`${API_URL}/service/anime/home`, {
-      params: { limit },
-    });
-
-    const formatted = {
-      trending: formatAnimeList(response.data?.trending, "trending"),
-      completed: formatAnimeList(response.data?.completed, "completed"),
-      ova: formatAnimeList(response.data?.ova, "ova"),
-    };
-
-    writeCache(cacheKey, formatted);
-    return formatted;
-  } catch (error) {
-    console.error("error:", error);
-    return readCache(cacheKey) || { trending: [], completed: [], ova: [] };
+    return await homeRequest;
+  } finally {
+    homeRequest = null;
   }
 };
 

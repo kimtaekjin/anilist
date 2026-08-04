@@ -2,12 +2,13 @@ import Anime from "../models/anime.js";
 import redis from "../config/redis.js";
 import { fetchAnime } from "../components/fetchAnime.js";
 import { queries } from "../components/animeQuery.js";
+import { translateItem } from "../components/translateItem.js";
 
 const DEFAULT_INTERVAL = 1000 * 60 * 60 * 24;
 const DEFAULT_TYPE_DELAY = 1000 * 60;
 const DEFAULT_STARTUP_DELAY = 1000 * 60;
 const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS || 60 * 60 * 24);
-const RESPONSE_CACHE_VERSION = "deepl-ko-v1";
+const RESPONSE_CACHE_VERSION = "deepl-ko-v2";
 const HOME_LIMIT = 30;
 const SEASONS = ["WINTER", "SPRING", "SUMMER", "FALL"];
 let activeSync = null;
@@ -39,6 +40,26 @@ function createResponseCachePayload(data) {
     version: RESPONSE_CACHE_VERSION,
     data,
   });
+}
+
+function hasJapanese(text) {
+  return !/[가-힣]/.test(text || "") && /[\u3040-\u30ff\u3400-\u9fff]/.test(text || "");
+}
+
+async function localizeTitles(data) {
+  return Promise.all(
+    data.map(async (anime) => {
+      if (!hasJapanese(anime.title)) return anime;
+
+      const sourceTitle = anime.originalTitle?.native || anime.originalTitle?.romaji || anime.title;
+      const translatedTitle = await translateItem(sourceTitle);
+      return { ...anime, title: translatedTitle };
+    }),
+  );
+}
+
+function hasUntranslatedTitles(data) {
+  return data.some((anime) => hasJapanese(anime?.title));
 }
 
 function getListSort(type) {
@@ -128,8 +149,13 @@ async function getGenreListFromDb(target) {
 async function saveListCache(type) {
   if (!redis.isOpen) return [];
 
-  const data = await getListFromDb(type);
+  const data = await localizeTitles(await getListFromDb(type));
   if (!data.length) return data;
+
+  if (hasUntranslatedTitles(data)) {
+    console.warn(`[${type}] 미번역 제목이 남아 Redis 캐시 저장을 건너뜁니다.`);
+    return data;
+  }
 
   await writeRedisCache(getListCacheKey(type, getNormalizedQuery(type)), createResponseCachePayload(data));
   console.log(`[${type}] Redis 목록 캐시 저장: ${data.length}개`);
@@ -140,8 +166,13 @@ async function saveGenreCache(target) {
   if (!redis.isOpen) return [];
 
   const normalizedQuery = getNormalizedQuery("genre", target);
-  const data = await getGenreListFromDb(normalizedQuery);
+  const data = await localizeTitles(await getGenreListFromDb(normalizedQuery));
   if (!data.length) return data;
+
+  if (hasUntranslatedTitles(data)) {
+    console.warn(`[genre ${normalizedQuery.year} ${normalizedQuery.season}] 미번역 제목이 남아 Redis 캐시 저장을 건너뜁니다.`);
+    return data;
+  }
 
   await writeRedisCache(getListCacheKey("genre", normalizedQuery), createResponseCachePayload(data));
   console.log(`[genre ${normalizedQuery.year} ${normalizedQuery.season}] Redis 목록 캐시 저장: ${data.length}개`);
@@ -164,14 +195,25 @@ async function warmHomeCache() {
     getListFromDb("ova"),
   ]);
 
-  const trendingItems = trending.slice(0, HOME_LIMIT);
+  const [localizedTrending, localizedCompleted, localizedOva] = await Promise.all([
+    localizeTitles(trending),
+    localizeTitles(completed),
+    localizeTitles(ova),
+  ]);
+
+  const trendingItems = localizedTrending.slice(0, HOME_LIMIT);
   const trendingIds = trendingItems.map((anime) => Number(anime._id)).filter((id) => Number.isInteger(id));
 
   const homeData = {
     trending: trendingItems,
-    completed: excludeAnime(completed, trendingIds).slice(0, HOME_LIMIT),
-    ova: ova.slice(0, HOME_LIMIT),
+    completed: excludeAnime(localizedCompleted, trendingIds).slice(0, HOME_LIMIT),
+    ova: localizedOva.slice(0, HOME_LIMIT),
   };
+
+  if (Object.values(homeData).some(hasUntranslatedTitles)) {
+    console.warn("[home] 미번역 제목이 남아 Redis 캐시 저장을 건너뜁니다.");
+    return;
+  }
 
   await writeRedisCache(`anime:home:limit=${HOME_LIMIT}`, createResponseCachePayload(homeData));
   console.log("[home] Redis 홈 캐시 저장");

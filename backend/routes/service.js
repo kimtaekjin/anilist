@@ -16,7 +16,7 @@ const MIN_LIST_ITEMS = Number(process.env.ANIME_MIN_LIST_ITEMS || 20);
 const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS || 60 * 60 * 24);
 const DETAIL_CACHE_TTL_SECONDS = Number(process.env.ANIME_DETAIL_CACHE_TTL_SECONDS || 60 * 60 * 24);
 const MAX_RESPONSE_LIMIT = 30;
-const RESPONSE_CACHE_VERSION = "deepl-ko-v1";
+const RESPONSE_CACHE_VERSION = "deepl-ko-v2";
 const ANILIST_REQUEST_TIMEOUT_MS = Number(process.env.ANILIST_REQUEST_TIMEOUT_MS || 10000);
 const listFetchLocks = new Map();
 
@@ -171,9 +171,11 @@ function isLikelyUntranslatedTitle(anime) {
   if (!title) return false;
 
   if (/[가-힣]/.test(title)) return false;
-  if (/[\u3040-\u30ff\u3400-\u9fff]/.test(title)) return true;
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(title);
+}
 
-  return Boolean(anime.originalTitle?.native || anime.originalTitle?.romaji || anime.originalTitle?.english);
+function hasUntranslatedTitles(data) {
+  return data.some((anime) => isLikelyUntranslatedTitle(anime));
 }
 
 async function localizeAnimeForResponse(anime, options = {}) {
@@ -183,7 +185,7 @@ async function localizeAnimeForResponse(anime, options = {}) {
     ? await Promise.all(item.genres.map((genre) => localizeGenre(genre)))
     : [];
 
-  if (!options.skipTitleTranslation && isLikelyUntranslatedTitle(item)) {
+  if (isLikelyUntranslatedTitle(item)) {
     const sourceTitle = item.originalTitle?.native || item.originalTitle?.romaji || item.title;
     item.title = await translateItem(sourceTitle).catch(() => item.title);
   }
@@ -203,9 +205,7 @@ async function getListDataForResponse(type, options = {}) {
   const normalizedQuery = options.normalizedQuery || {};
   const excludedIds = options.excludedIds || [];
   const responseLimit = options.limit || null;
-  const localizeOptions = {
-    skipTitleTranslation: type === "genre",
-  };
+  const localizeOptions = {};
   const cacheKey = getListCacheKey(type, normalizedQuery);
   const dbFilter = getListDbFilter(type, normalizedQuery);
   const sort = getListSort(type);
@@ -249,7 +249,9 @@ async function getListDataForResponse(type, options = {}) {
 
       if (redis.isOpen && !excludedIds.length) {
         const fullLocalizedData = await localizeListForResponse(fullData, localizeOptions);
-        await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(fullLocalizedData));
+        if (!hasUntranslatedTitles(fullLocalizedData)) {
+          await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(fullLocalizedData));
+        }
       }
     } catch (error) {
       if (!responseData.length) {
@@ -263,7 +265,7 @@ async function getListDataForResponse(type, options = {}) {
   const limitedData = limitAnimeList(responseData, responseLimit);
   const localizedData = await localizeListForResponse(limitedData, localizeOptions);
 
-  if (redis.isOpen && !excludedIds.length && !responseLimit) {
+  if (redis.isOpen && !excludedIds.length && !responseLimit && !hasUntranslatedTitles(localizedData)) {
     await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
   }
 
@@ -414,7 +416,7 @@ router.get("/anime/detail/:id", async (req, res) => {
 
     const localizedMedia = await localizeAnimeForResponse(media);
 
-    if (redis.isOpen) {
+    if (redis.isOpen && !isLikelyUntranslatedTitle(localizedMedia)) {
       await writeRedisCache(detailCacheKey, DETAIL_CACHE_TTL_SECONDS, createResponseCachePayload(localizedMedia));
     }
 
@@ -456,7 +458,7 @@ router.get("/anime/home", async (req, res) => {
       ova,
     };
 
-    if (redis.isOpen) {
+    if (redis.isOpen && !Object.values(homeData).some(hasUntranslatedTitles)) {
       await writeRedisCache(homeCacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(homeData));
     }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-function MainPageCard({ title, animeList }) {
+function MainPageCard({ title, animeList, eagerImageCount = 0 }) {
   const scrollRef = useRef(null);
   const navigate = useNavigate();
 
@@ -97,7 +97,7 @@ function MainPageCard({ title, animeList }) {
                   src={anime.image?.large}
                   alt={anime.title}
                   className="h-72 w-full object-cover"
-                  loading={index < 6 ? "eager" : "lazy"}
+                  loading={index < eagerImageCount ? "eager" : "lazy"}
                   decoding="async"
                 />
 

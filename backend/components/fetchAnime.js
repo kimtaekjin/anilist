@@ -62,7 +62,6 @@ export async function fetchAnime(query, type, body = {}) {
     season: (body.season || defaultSeason).toUpperCase(),
     year: body.year || year,
   };
-  const skipTitleTranslation = body.skipTitleTranslation ?? type === "genre";
 
   async function fetchPage(pageNumber, retryCount = 0) {
     try {
@@ -167,10 +166,9 @@ export async function fetchAnime(query, type, body = {}) {
       : [];
 
     const sourceTitle = anime.title?.native || anime.title?.romaji || anime.title?.english || "";
-    const title =
-      !skipTitleTranslation && anime.title?.native
-        ? await translateItem(anime.title.native).catch(() => anime.title?.romaji || sourceTitle)
-        : sourceTitle;
+    const title = anime.title?.native
+      ? await translateItem(anime.title.native).catch(() => anime.title?.romaji || sourceTitle)
+      : sourceTitle;
 
     return {
       _id: anime.id,
@@ -213,16 +211,26 @@ export async function fetchAnime(query, type, body = {}) {
   if (media.length) {
     try {
       await Anime.bulkWrite(
-        media.map((anime) => ({
-          updateOne: {
-            filter: { _id: anime._id },
-            update: {
-              $set: anime,
-              $addToSet: { contentTypes: type },
+        media.map((anime) => {
+          const { title, ...animeFields } = anime;
+          const hasKoreanTitle = /[가-힣]/.test(title);
+          const update = {
+            $set: hasKoreanTitle ? { ...animeFields, title } : animeFields,
+            $addToSet: { contentTypes: type },
+          };
+
+          if (!hasKoreanTitle) {
+            update.$setOnInsert = { title };
+          }
+
+          return {
+            updateOne: {
+              filter: { _id: anime._id },
+              update,
+              upsert: true,
             },
-            upsert: true,
-          },
-        })),
+          };
+        }),
         { ordered: false },
       );
     } catch (error) {

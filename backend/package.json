@@ -24,6 +24,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "sync:anime": "node jobs/runAnimeSync.js",
+    "repair:anime-titles": "node jobs/repairAnimeTitles.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -1,90 +1,61 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import loginImage from "../../asset/login.jpg";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
+import AuthLayout, { AuthField, authButtonClass } from "./AuthLayout";
+import loginReviewImage from "../../asset/auth-login-review.png";
 
-const Login = () => {
+export default function Login() {
+  const navigate = useNavigate();
+  const { user, loading, checkAuth } = useAuth();
+  const API_URL = process.env.REACT_APP_CLIENT_URL;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const navigate = useNavigate();
-  const { checkAuth } = useAuth();
-
-  const API_URL = process.env.REACT_APP_CLIENT_URL;
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const verify = async () => {
-      const user = await checkAuth();
-      if (user) {
-        alert("접근할 수 없는 페이지입니다.");
-        navigate("/");
-      }
-    };
-    verify();
-  }, [checkAuth, navigate]);
+    if (!loading && user) navigate("/", { replace: true });
+  }, [loading, user, navigate]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
     try {
-      const response = await axios.post(`${API_URL}/user/login`, { email, password }, { withCredentials: true });
-      if (response.data) {
-        await checkAuth();
-        alert(response.data.message || "로그인 되었습니다.");
-        navigate("/");
-      }
-    } catch (error) {
-      const message = error.response?.data?.message || "로그인에 실패하였습니다.";
-      alert(message);
+      setSubmitting(true);
+      setError("");
+      await axios.post(`${API_URL}/user/login`, { email: email.trim(), password }, { withCredentials: true });
+      await checkAuth();
+      navigate("/", { replace: true });
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "로그인에 실패했습니다. 입력 정보를 확인해주세요.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-white">
-      <div className="flex rounded-lg overflow-hidden">
-        {/* 이미지 영역 */}
-        <div className="w-1/2" style={{ height: "400px" }}>
-          <img src={loginImage} alt="login" className="w-full h-full object-cover" />
+    <AuthLayout
+      panelImage={loginReviewImage}
+      eyebrow="Welcome back"
+      title="다시 만나 반가워요"
+      description="계정에 로그인하고 관심 작품과 커뮤니티 활동을 이어가세요."
+      footer={<>아직 계정이 없나요? <Link to="/user/singUp" className="font-bold text-amber-300 hover:text-amber-200">회원가입</Link></>}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <AuthField label="이메일" icon={Mail} type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+        <AuthField label="비밀번호" icon={LockKeyhole} type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="비밀번호를 입력하세요" />
+        {error ? <p role="alert" className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <div className="flex justify-end">
+          <Link to="/user/find" className="text-xs font-semibold text-stone-500 transition hover:text-amber-300">비밀번호를 잊으셨나요?</Link>
         </div>
-
-        {/* 로그인 폼 */}
-        <div className="bg-gray-50 p-8 w-80 max-w-md flex flex-col justify-center" style={{ height: "400px" }}>
-          <h3 className="text-2xl font-bold mb-10 text-center text-gray-500">Login</h3>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none mb-4"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none mb-6"
-            />
-            <div className="flex justify-center">
-              <button type="submit" className="w-1/2 bg-blue-400 text-white py-2 rounded hover:bg-blue-500 transition">
-                로그인
-              </button>
-            </div>
-          </form>
-          <div className="flex justify-center mt-5 " onClick={() => navigate("/user/find")}>
-            <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
-              비밀번호를 잃어버리셨나요?
-            </p>
-          </div>
-
-          <div className="flex justify-center mt-3" onClick={() => navigate("/user/singUp")}>
-            <p className="text-xs text-gray-400 font-medium cursor-pointer hover:text-blue-300 transition duration-300">
-              회원가입
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+        <button type="submit" disabled={submitting} className={authButtonClass}>
+          {submitting ? "로그인 중..." : "로그인"}
+          {!submitting ? <ArrowRight size={17} /> : null}
+        </button>
+      </form>
+    </AuthLayout>
   );
-};
-
-export default Login;
+}

@@ -7,6 +7,7 @@ import "dotenv/config";
 import service from "./routes/service.js";
 import user from "./routes/user.js";
 import post from "./routes/post.js";
+import animeComment from "./routes/animeComment.js";
 import { startAnimeSync } from "./jobs/syncAnime.js";
 
 const app = express();
@@ -34,6 +35,7 @@ app.use(cookieParser());
 app.use("/service", service);
 app.use("/user", user);
 app.use("/post", post);
+app.use("/anime-comments", animeComment);
 
 app.get("/healthz", (req, res) => res.send("OK"));
 

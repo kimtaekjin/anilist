@@ -4,6 +4,7 @@ import { Building } from "lucide-react";
 import { fetchDetailAnime } from "../../Components/items/AniListItem.jsx";
 import { AnimeDetailSkeleton } from "../../Components/items/Skeleton";
 import StarRating from "../../Components/items/StarRating";
+import AnimeComments from "./AnimeComments";
 
 const AnimeDetail = () => {
   const { id } = useParams();
@@ -117,6 +118,8 @@ const AnimeDetail = () => {
           ))}
         </div>
       </div>
+
+      <AnimeComments animeId={id} />
     </div>
   );
 };

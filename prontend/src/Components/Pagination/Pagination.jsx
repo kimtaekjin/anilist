@@ -2,15 +2,14 @@ import React from "react";
 
 const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 6, onPageChange }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const groupStart = Math.floor((currentPage - 1) / maxPageButtons) * maxPageButtons + 1;
+  const groupEnd = Math.min(groupStart + maxPageButtons - 1, totalPages);
 
   if (totalPages <= 1) return null;
 
   const getPageNumbers = () => {
     const pages = [];
-    const start = Math.max(currentPage, 1);
-    const end = Math.min(start + maxPageButtons - 1, totalPages);
-
-    for (let i = start; i <= end; i++) pages.push(i);
+    for (let i = groupStart; i <= groupEnd; i++) pages.push(i);
     return pages;
   };
 
@@ -25,9 +24,9 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 6,
   return (
     <div className="mt-10 flex flex-wrap justify-center gap-2">
       <button
-        onClick={() => currentPage > 1 && changePage(Math.max(currentPage - 6, 1))}
+        onClick={() => groupStart > 1 && changePage(Math.max(groupStart - 1, 1))}
         className={`${buttonBase} ${
-          currentPage === 1
+          groupStart === 1
             ? "cursor-not-allowed opacity-40"
             : "bg-[#181816] text-stone-300 hover:-translate-y-0.5 hover:border-amber-500 hover:text-amber-300"
         }`}
@@ -50,9 +49,9 @@ const Pagination = ({ currentPage, totalItems, itemsPerPage, maxPageButtons = 6,
       ))}
 
       <button
-        onClick={() => currentPage < totalPages && changePage(Math.min(currentPage + 6, totalPages))}
+        onClick={() => groupEnd < totalPages && changePage(Math.min(groupEnd + 1, totalPages))}
         className={`${buttonBase} ${
-          currentPage === totalPages
+          groupEnd === totalPages
             ? "cursor-not-allowed opacity-40"
             : "bg-[#181816] text-stone-300 hover:-translate-y-0.5 hover:border-amber-500 hover:text-amber-300"
         }`}

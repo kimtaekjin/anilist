@@ -100,7 +100,7 @@ function getViewCacheKey(postId, viewerKey) {
 }
 
 async function shouldIncrementView(postId, viewerKey) {
-  if (!redis.isOpen) return true;
+  if (!redis.isReady) return true;
 
   try {
     const result = await redis.set(getViewCacheKey(postId, viewerKey), "1", {

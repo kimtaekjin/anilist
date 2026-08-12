@@ -5,19 +5,39 @@ import { queries } from "../components/animeQuery.js";
 import { translateItem } from "../components/translateItem.js";
 
 const DEFAULT_INTERVAL = 1000 * 60 * 60 * 24;
-const DEFAULT_TYPE_DELAY = 1000 * 60;
-const DEFAULT_STARTUP_DELAY = 1000 * 60;
+const DEFAULT_TYPE_DELAY = 0;
 const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS || 60 * 60 * 24);
-const RESPONSE_CACHE_VERSION = "deepl-ko-v2";
+const GENRE_CACHE_TTL_SECONDS = Number(process.env.ANIME_GENRE_CACHE_TTL_SECONDS || 60 * 60 * 24 * 30);
+const RESPONSE_CACHE_VERSION = "catalog-ko-v3";
 const HOME_LIMIT = 30;
 const SEASONS = ["WINTER", "SPRING", "SUMMER", "FALL"];
+const LIST_RESPONSE_FIELDS = [
+  "_id",
+  "idMal",
+  "title",
+  "originalTitle",
+  "image",
+  "bannerImage",
+  "genres",
+  "days",
+  "startDate",
+  "season",
+  "seasonYear",
+  "episodes",
+  "status",
+  "averageScore",
+  "popularity",
+  "studio",
+  "type",
+  "nextAiringEpisode",
+].join(" ");
 let activeSync = null;
 
-async function writeRedisCache(key, value) {
-  if (!redis.isOpen) return false;
+async function writeRedisCache(key, value, ttlSeconds = LIST_CACHE_TTL_SECONDS) {
+  if (!redis.isReady) return false;
 
   try {
-    await redis.setEx(key, LIST_CACHE_TTL_SECONDS, value);
+    await redis.setEx(key, ttlSeconds, value);
     return true;
   } catch (error) {
     console.error(`Redis cache warm-up failed (${key}):`, error.message);
@@ -71,21 +91,20 @@ function getListSort(type) {
 }
 
 function getDefaultSeasonYear() {
-  const now = new Date();
-  const month = now.getMonth() + 1;
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const month = kstNow.getUTCMonth() + 1;
   const season = month <= 3 ? "WINTER" : month <= 6 ? "SPRING" : month <= 9 ? "SUMMER" : "FALL";
 
   return {
     season,
-    year: now.getFullYear(),
+    year: kstNow.getUTCFullYear(),
   };
 }
 
 function getGenrePrecacheRange() {
-  const now = new Date();
-  const currentYear = now.getFullYear();
+  const currentYear = getDefaultSeasonYear().year;
   const yearsBack = Number(process.env.ANIME_GENRE_PRECACHE_YEARS_BACK || 5);
-  const yearsAhead = Number(process.env.ANIME_GENRE_PRECACHE_YEARS_AHEAD || 1);
+  const yearsAhead = Number(process.env.ANIME_GENRE_PRECACHE_YEARS_AHEAD || 0);
   const startYear = currentYear - yearsBack;
   const endYear = currentYear + yearsAhead;
   const targets = [];
@@ -125,29 +144,36 @@ function getNormalizedQuery(type, override = {}) {
 }
 
 function getDbFilter(type, normalizedQuery = {}) {
-  const filter = {
-    contentTypes: { $in: [type] },
-  };
-
   if (type === "genre") {
-    filter.season = normalizedQuery.season;
-    filter.seasonYear = normalizedQuery.year;
+    return {
+      season: normalizedQuery.season,
+      seasonYear: normalizedQuery.year,
+      isCatalogActive: { $ne: false },
+    };
   }
 
-  return filter;
+  return {
+    contentTypes: { $in: [type] },
+  };
 }
 
 async function getListFromDb(type) {
-  return Anime.find(getDbFilter(type, getNormalizedQuery(type))).sort(getListSort(type)).lean();
+  return Anime.find(getDbFilter(type, getNormalizedQuery(type)))
+    .select(LIST_RESPONSE_FIELDS)
+    .sort(getListSort(type))
+    .lean();
 }
 
 async function getGenreListFromDb(target) {
   const normalizedQuery = getNormalizedQuery("genre", target);
-  return Anime.find(getDbFilter("genre", normalizedQuery)).sort(getListSort("genre")).lean();
+  return Anime.find(getDbFilter("genre", normalizedQuery))
+    .select(LIST_RESPONSE_FIELDS)
+    .sort(getListSort("genre"))
+    .lean();
 }
 
 async function saveListCache(type) {
-  if (!redis.isOpen) return [];
+  if (!redis.isReady) return [];
 
   const data = await localizeTitles(await getListFromDb(type));
   if (!data.length) return data;
@@ -162,19 +188,17 @@ async function saveListCache(type) {
   return data;
 }
 
-async function saveGenreCache(target) {
-  if (!redis.isOpen) return [];
+export async function warmGenreCache(target) {
+  if (!redis.isReady) return [];
 
   const normalizedQuery = getNormalizedQuery("genre", target);
-  const data = await localizeTitles(await getGenreListFromDb(normalizedQuery));
-  if (!data.length) return data;
+  const data = await getGenreListFromDb(normalizedQuery);
 
-  if (hasUntranslatedTitles(data)) {
-    console.warn(`[genre ${normalizedQuery.year} ${normalizedQuery.season}] 미번역 제목이 남아 Redis 캐시 저장을 건너뜁니다.`);
-    return data;
-  }
-
-  await writeRedisCache(getListCacheKey("genre", normalizedQuery), createResponseCachePayload(data));
+  await writeRedisCache(
+    getListCacheKey("genre", normalizedQuery),
+    createResponseCachePayload(data),
+    GENRE_CACHE_TTL_SECONDS,
+  );
   console.log(`[genre ${normalizedQuery.year} ${normalizedQuery.season}] Redis 목록 캐시 저장: ${data.length}개`);
   return data;
 }
@@ -187,7 +211,7 @@ function excludeAnime(data, excludedIds) {
 }
 
 async function warmHomeCache() {
-  if (!redis.isOpen) return;
+  if (!redis.isReady) return;
 
   const [trending, completed, ova] = await Promise.all([
     getListFromDb("trending"),
@@ -220,7 +244,7 @@ async function warmHomeCache() {
 }
 
 async function warmListCaches() {
-  if (!redis.isOpen) {
+  if (!redis.isReady) {
     console.log("Redis가 연결되지 않아 애니 캐시 워밍을 건너뜁니다.");
     return;
   }
@@ -230,7 +254,7 @@ async function warmListCaches() {
   }
 
   for (const target of getGenrePrecacheRange()) {
-    await saveGenreCache(target);
+    await warmGenreCache(target);
   }
 
   await warmHomeCache();
@@ -243,15 +267,15 @@ async function syncGenrePrecache(typeDelay) {
 
   for (const target of targets) {
     try {
-      await fetchAnime(queries.genre, "genre", target);
-      await sleep(typeDelay);
+      await fetchAnime(queries.genre, "genre", target, { fetchAllPages: true });
+      if (typeDelay > 0) await sleep(typeDelay);
     } catch (err) {
       console.error(`[genre ${target.year} ${target.season}] 동기화 실패:`, err);
       if (err.status === 429 || err.status === 403 || err.status >= 500) {
         console.error("AniList 호출 제한 또는 일시 장애로 장르 선동기화를 중단합니다.");
         break;
       }
-      await sleep(typeDelay);
+      if (typeDelay > 0) await sleep(typeDelay);
     }
   }
 }
@@ -264,14 +288,14 @@ async function runSync(options = {}) {
   for (const [type, query] of syncTargets) {
     try {
       await fetchAnime(query, type);
-      await sleep(typeDelay);
+      if (typeDelay > 0) await sleep(typeDelay);
     } catch (err) {
       console.error(`[${type}] 동기화 실패:`, err);
       if (err.status === 429 || err.status === 403 || err.status >= 500) {
         console.error("AniList 호출 제한 또는 일시 장애로 이번 동기화 사이클을 중단합니다.");
         break;
       }
-      await sleep(typeDelay);
+      if (typeDelay > 0) await sleep(typeDelay);
     }
   }
 
@@ -293,22 +317,43 @@ export function syncAll(options = {}) {
   return activeSync;
 }
 
+export function getMillisecondsUntilNextKstMidnight(now = new Date()) {
+  const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
+  const nextMidnightAsUtc = Date.UTC(
+    kstNow.getUTCFullYear(),
+    kstNow.getUTCMonth(),
+    kstNow.getUTCDate() + 1,
+  );
+
+  return nextMidnightAsUtc - kstNow.getTime();
+}
+
 export function startAnimeSync(options = {}) {
   const interval = Number(options.intervalMs ?? process.env.ANIME_SYNC_INTERVAL_MS ?? DEFAULT_INTERVAL);
-  const startupDelay = Number(options.startupDelayMs ?? process.env.ANIME_SYNC_STARTUP_DELAY_MS ?? DEFAULT_STARTUP_DELAY);
+  const configuredStartupDelay = options.startupDelayMs ?? process.env.ANIME_SYNC_STARTUP_DELAY_MS;
+  const startupDelay =
+    configuredStartupDelay === undefined
+      ? getMillisecondsUntilNextKstMidnight()
+      : Number(configuredStartupDelay);
 
   const runScheduledSync = () => {
     syncAll().catch((error) => console.error("Scheduled anime sync failed:", error));
   };
-  const timeoutId = setTimeout(runScheduledSync, startupDelay);
-  const intervalId = setInterval(runScheduledSync, interval);
+  let intervalId = null;
+  const timeoutId = setTimeout(() => {
+    runScheduledSync();
+    intervalId = setInterval(runScheduledSync, interval);
+  }, startupDelay);
 
   return {
     timeoutId,
-    intervalId,
+    get intervalId() {
+      return intervalId;
+    },
     stop() {
       clearTimeout(timeoutId);
-      clearInterval(intervalId);
+      if (intervalId) clearInterval(intervalId);
     },
   };
 }

@@ -4,6 +4,8 @@ export const queries = {
     Page(perPage: 50) {
       media(type: ANIME, format: TV, sort: POPULARITY_DESC) {
         id
+        idMal
+        updatedAt
         title {
           romaji
           english
@@ -46,6 +48,8 @@ export const queries = {
       Page(perPage: 50) {
         media(type: ANIME, format: TV, sort: SCORE_DESC, status: FINISHED) {
           id
+          idMal
+          updatedAt
           title {
             romaji
             english
@@ -74,6 +78,10 @@ export const queries = {
           averageScore
           episodes
           popularity
+          nextAiringEpisode {
+            episode
+            airingAt
+          }
         }
       }
     }`,
@@ -83,6 +91,8 @@ export const queries = {
       Page(perPage: 50) {
         media(type: ANIME, format_in: [OVA, MOVIE],status:FINISHED ,sort: POPULARITY_DESC) {
           id
+          idMal
+          updatedAt
           title {
             romaji
             english
@@ -110,6 +120,11 @@ export const queries = {
           status
           averageScore
           popularity
+          episodes
+          nextAiringEpisode {
+            episode
+            airingAt
+          }
         }
       }
     }`,
@@ -118,6 +133,7 @@ export const queries = {
      query ($id: Int!) {
       Media(id: $id, type: ANIME) {
         id
+        updatedAt
         idMal
         title {
           romaji
@@ -187,6 +203,8 @@ export const queries = {
           seasonYear: $year
         ) {
           id
+          idMal
+          updatedAt
           title {
             romaji
             english
@@ -215,10 +233,29 @@ export const queries = {
           format
           averageScore
           popularity
-        nextAiringEpisode {
-          episode
-          airingAt
-        }
+          nextAiringEpisode {
+            episode
+            airingAt
+          }
+          description
+          trailer {
+            id
+            site
+          }
+          characters(sort: ROLE, perPage: 6) {
+            edges {
+              role
+              node {
+                name {
+                  full
+                  native
+                }
+                image {
+                  large
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -233,9 +270,11 @@ export const queries = {
           type: ANIME
           season: $season
           seasonYear: $year
-          sort: POPULARITY_DESC
+          sort: ID
         ) {
           id
+          idMal
+          updatedAt
           title {
             romaji
             english
@@ -264,6 +303,29 @@ export const queries = {
           popularity
           episodes
           bannerImage
+          nextAiringEpisode {
+            episode
+            airingAt
+          }
+          description
+          trailer {
+            id
+            site
+          }
+          characters(sort: ROLE, perPage: 6) {
+            edges {
+              role
+              node {
+                name {
+                  full
+                  native
+                }
+                image {
+                  large
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -279,6 +341,8 @@ export const queries = {
               ) 
               {
                 id
+                idMal
+                updatedAt
                 season
                 seasonYear
                 title {
@@ -296,6 +360,7 @@ export const queries = {
                 status
                 averageScore
                 popularity
+                episodes
                 startDate {
                   year
                   month
@@ -305,6 +370,10 @@ export const queries = {
                   nodes {
                     name
                   }
+                }
+                nextAiringEpisode {
+                  episode
+                  airingAt
                 }
               }
             }

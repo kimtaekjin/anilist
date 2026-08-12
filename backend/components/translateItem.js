@@ -195,7 +195,7 @@ async function findCachedTranslation(originalText, sourceLang, targetLang) {
   }
 
   const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang);
-  if (redis.isOpen) {
+  if (redis.isReady) {
     try {
       const cached = await redis.get(redisCacheKey);
       if (cached && !shouldIgnoreCachedTranslation(originalText, cached)) {
@@ -224,7 +224,7 @@ async function findCachedTranslation(originalText, sourceLang, targetLang) {
       }
 
       memoryCache.set(cacheKey, cached.translatedText);
-      if (redis.isOpen) {
+      if (redis.isReady) {
         await redis.setEx(redisCacheKey, REDIS_CACHE_TTL_SECONDS, cached.translatedText).catch((error) => {
           console.error("Translation Redis cache save failed:", error.message);
         });
@@ -246,7 +246,7 @@ async function saveCachedTranslation(originalText, sourceLang, targetLang, trans
   const cacheKey = getCacheKey(originalText, sourceLang, targetLang);
   memoryCache.set(cacheKey, translatedText);
 
-  if (redis.isOpen) {
+  if (redis.isReady) {
     const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang);
     await redis.setEx(redisCacheKey, REDIS_CACHE_TTL_SECONDS, translatedText).catch((error) => {
       console.error("Translation Redis cache save failed:", error.message);

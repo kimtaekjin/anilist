@@ -103,7 +103,7 @@ const selectStyles = {
 };
 
 const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({ length: currentYear - 2009 }, (_, i) => currentYear - i);
+const yearOptions = Array.from({ length: currentYear - 1999 }, (_, i) => currentYear - i);
 
 const getCurrentSeason = () => {
   const month = new Date().getMonth() + 1;
@@ -131,6 +131,8 @@ const GenreSection = () => {
   const itemsPerPage = 12;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchAnime = async () => {
       const cached = getCachedAniList("genre", selectedSeason, selectedYear) || [];
       setAnimeList(cached);
@@ -139,15 +141,19 @@ const GenreSection = () => {
 
       try {
         const processed = await fetchAniList("genre", selectedSeason, selectedYear);
-        setAnimeList(processed || []);
+        if (!cancelled) setAnimeList(processed || []);
       } catch (error) {
         console.error(error);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchAnime();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSeason, selectedYear]);
 
   useEffect(() => {

@@ -2,26 +2,45 @@
 import { localizeGenre } from "../components/animeLocalization.js";
 import { translateItem } from "../components/translateItem.js";
 import { queries } from "../components/animeQuery.js";
-import { fetchAnime } from "../components/fetchAnime.js";
 import redis from "../config/redis.js";
 import Anime from "../models/anime.js";
+import { requestAniList } from "../components/anilistClient.js";
 
 const router = express.Router();
 
 router.use(express.json());
 
-const ANILIST_ENDPOINT = "https://graphql.anilist.co";
 const SUPPORTED_LIST_TYPES = ["trending", "completed", "ova", "airing", "genre", "upcoming"];
-const MIN_LIST_ITEMS = Number(process.env.ANIME_MIN_LIST_ITEMS || 20);
 const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS || 60 * 60 * 24);
+const GENRE_CACHE_TTL_SECONDS = Number(process.env.ANIME_GENRE_CACHE_TTL_SECONDS || 60 * 60 * 24 * 30);
 const DETAIL_CACHE_TTL_SECONDS = Number(process.env.ANIME_DETAIL_CACHE_TTL_SECONDS || 60 * 60 * 24);
 const MAX_RESPONSE_LIMIT = 30;
-const RESPONSE_CACHE_VERSION = "deepl-ko-v2";
-const ANILIST_REQUEST_TIMEOUT_MS = Number(process.env.ANILIST_REQUEST_TIMEOUT_MS || 10000);
-const listFetchLocks = new Map();
+const RESPONSE_CACHE_VERSION = "catalog-ko-v3";
+const CATALOG_START_YEAR = Number(process.env.ANIME_CATALOG_START_YEAR || 2000);
+const VALID_SEASONS = new Set(["WINTER", "SPRING", "SUMMER", "FALL"]);
+const LIST_RESPONSE_FIELDS = [
+  "_id",
+  "idMal",
+  "title",
+  "originalTitle",
+  "image",
+  "bannerImage",
+  "genres",
+  "days",
+  "startDate",
+  "season",
+  "seasonYear",
+  "episodes",
+  "status",
+  "averageScore",
+  "popularity",
+  "studio",
+  "type",
+  "nextAiringEpisode",
+].join(" ");
 
 async function readRedisCache(key) {
-  if (!redis.isOpen) return null;
+  if (!redis.isReady) return null;
 
   try {
     return await redis.get(key);
@@ -32,7 +51,7 @@ async function readRedisCache(key) {
 }
 
 async function writeRedisCache(key, ttlSeconds, value) {
-  if (!redis.isOpen) return false;
+  if (!redis.isReady) return false;
 
   try {
     await redis.setEx(key, ttlSeconds, value);
@@ -48,13 +67,13 @@ function normalizeAnimeType(type) {
 }
 
 function getDefaultSeasonYear() {
-  const now = new Date();
-  const month = now.getMonth() + 1;
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const month = kstNow.getUTCMonth() + 1;
   const season = month <= 3 ? "WINTER" : month <= 6 ? "SPRING" : month <= 9 ? "SUMMER" : "FALL";
 
   return {
     season,
-    year: now.getFullYear(),
+    year: kstNow.getUTCFullYear(),
   };
 }
 
@@ -62,9 +81,18 @@ function normalizeListQuery(type, query) {
   const defaults = getDefaultSeasonYear();
 
   if (type === "genre") {
+    const season = String(query.season || defaults.season).toUpperCase();
+    const year = query.year === undefined ? defaults.year : Number(query.year);
+
+    if (!VALID_SEASONS.has(season) || !Number.isInteger(year) || year < CATALOG_START_YEAR || year > defaults.year) {
+      const error = new Error("올바른 연도와 분기를 입력해 주세요.");
+      error.status = 400;
+      throw error;
+    }
+
     return {
-      season: (query.season || defaults.season).toUpperCase(),
-      year: Number(query.year) || defaults.year,
+      season,
+      year,
     };
   }
 
@@ -109,16 +137,17 @@ function readResponseCachePayload(cached) {
   return parsed.version === RESPONSE_CACHE_VERSION ? parsed.data : null;
 }
 function getListDbFilter(type, normalizedQuery) {
-  const filter = {
-    contentTypes: { $in: [type] },
-  };
-
   if (type === "genre") {
-    filter.season = normalizedQuery.season;
-    filter.seasonYear = normalizedQuery.year;
+    return {
+      season: normalizedQuery.season,
+      seasonYear: normalizedQuery.year,
+      isCatalogActive: { $ne: false },
+    };
   }
 
-  return filter;
+  return {
+    contentTypes: { $in: [type] },
+  };
 }
 
 function getExcludedAnimeIds(query) {
@@ -153,19 +182,6 @@ function getListSort(type) {
   return { popularity: -1, averageScore: -1 };
 }
 
-async function fetchListWithLock(cacheKey, query, type, normalizedQuery) {
-  if (listFetchLocks.has(cacheKey)) {
-    return listFetchLocks.get(cacheKey);
-  }
-
-  const promise = fetchAnime(query, type, normalizedQuery).finally(() => {
-    listFetchLocks.delete(cacheKey);
-  });
-
-  listFetchLocks.set(cacheKey, promise);
-  return promise;
-}
-
 function isLikelyUntranslatedTitle(anime) {
   const title = anime?.title;
   if (!title) return false;
@@ -197,15 +213,10 @@ async function localizeAnimeForResponse(anime, options = {}) {
   return item;
 }
 
-async function localizeListForResponse(data, options = {}) {
-  return Promise.all(data.map((anime) => localizeAnimeForResponse(anime, options)));
-}
-
 async function getListDataForResponse(type, options = {}) {
   const normalizedQuery = options.normalizedQuery || {};
   const excludedIds = options.excludedIds || [];
   const responseLimit = options.limit || null;
-  const localizeOptions = {};
   const cacheKey = getListCacheKey(type, normalizedQuery);
   const dbFilter = getListDbFilter(type, normalizedQuery);
   const sort = getListSort(type);
@@ -214,7 +225,7 @@ async function getListDataForResponse(type, options = {}) {
   if (cached) {
     const cachedData = readResponseCachePayload(cached);
     const filteredCachedData = Array.isArray(cachedData) ? filterExcludedAnime(cachedData, excludedIds) : null;
-    if (Array.isArray(filteredCachedData) && filteredCachedData.length > 0) {
+    if (Array.isArray(filteredCachedData)) {
       console.log(`Redis HIT ${cacheKey}`);
       return limitAnimeList(filteredCachedData, responseLimit);
     }
@@ -223,79 +234,33 @@ async function getListDataForResponse(type, options = {}) {
     const filteredLegacyCachedData = Array.isArray(legacyCachedData)
       ? filterExcludedAnime(legacyCachedData, excludedIds)
       : null;
-    if (Array.isArray(filteredLegacyCachedData) && filteredLegacyCachedData.length > 0) {
+    if (Array.isArray(filteredLegacyCachedData)) {
       console.log(`Redis HIT legacy ${cacheKey}`);
-      const limitedLegacyData = limitAnimeList(filteredLegacyCachedData, responseLimit);
-      return localizeListForResponse(limitedLegacyData, localizeOptions);
+      return limitAnimeList(filteredLegacyCachedData, responseLimit);
     }
   }
 
   const dbQueryLimit = responseLimit ? responseLimit + excludedIds.length : 0;
-  let dbQuery = Anime.find(dbFilter).sort(sort);
+  let dbQuery = Anime.find(dbFilter).select(LIST_RESPONSE_FIELDS).sort(sort);
   if (dbQueryLimit) {
     dbQuery = dbQuery.limit(dbQueryLimit);
   }
 
-  let data = await dbQuery.lean();
-  let responseData = filterExcludedAnime(data, excludedIds);
-  const shouldFetchMore = responseLimit ? responseData.length === 0 : data.length < MIN_LIST_ITEMS;
-
-  if (shouldFetchMore) {
-    try {
-      await fetchListWithLock(cacheKey, queries[type], type, normalizedQuery);
-      const fullData = await Anime.find(dbFilter).sort(sort).lean();
-      responseData = filterExcludedAnime(fullData, excludedIds);
-      data = dbQueryLimit ? fullData.slice(0, dbQueryLimit) : fullData;
-
-      if (redis.isOpen && !excludedIds.length) {
-        const fullLocalizedData = await localizeListForResponse(fullData, localizeOptions);
-        if (!hasUntranslatedTitles(fullLocalizedData)) {
-          await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(fullLocalizedData));
-        }
-      }
-    } catch (error) {
-      if (!responseData.length) {
-        throw error;
-      }
-
-      console.error(`[${type}] AniList fetch failed, returning DB data:`, error);
-    }
-  }
-
+  const data = await dbQuery.lean();
+  const responseData = filterExcludedAnime(data, excludedIds);
   const limitedData = limitAnimeList(responseData, responseLimit);
-  const localizedData = await localizeListForResponse(limitedData, localizeOptions);
 
-  if (redis.isOpen && !excludedIds.length && !responseLimit && !hasUntranslatedTitles(localizedData)) {
-    await writeRedisCache(cacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(localizedData));
+  if (redis.isReady && !excludedIds.length && !responseLimit) {
+    const ttlSeconds = type === "genre" ? GENRE_CACHE_TTL_SECONDS : LIST_CACHE_TTL_SECONDS;
+    void writeRedisCache(cacheKey, ttlSeconds, createResponseCachePayload(limitedData));
   }
 
-  return localizedData;
+  return limitedData;
 }
 
 async function fetchDetail(query, type, id) {
-  const response = await fetch(ANILIST_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      query,
-      variables: { id: Number(id) },
-    }),
-    signal: AbortSignal.timeout(ANILIST_REQUEST_TIMEOUT_MS),
-  });
-
-  const res = await response.json();
-
-  if (res.errors?.length) {
-    const firstError = res.errors[0];
-    const error = new Error(firstError.message || "AniList API error");
-    error.status = firstError.status || response.status;
-    throw error;
-  }
-
-  const data = res?.data?.Media;
+  const responseData = await requestAniList(query, { id: Number(id) });
+  const data = responseData?.Media;
 
   if (!data) {
     throw new Error("AniList 데이터 없음");
@@ -361,13 +326,17 @@ async function fetchDetail(query, type, id) {
     trailer: data.trailer || null,
     characters,
     nextAiringEpisode: data.nextAiringEpisode || null,
+    updatedAt: data.updatedAt || null,
+    lastCheckedAt: new Date(),
     lastSyncedAt: new Date(),
   };
 
+  const { _id, ...resultFields } = result;
+
   await Anime.updateOne(
-    { _id: result._id },
+    { _id },
     {
-      $set: result,
+      $set: resultFields,
       $addToSet: { contentTypes: type },
     },
     { upsert: true, runValidators: true },
@@ -387,7 +356,7 @@ router.get("/anime/detail/:id", async (req, res) => {
       return res.status(400).json({ message: "지원하지 않는 애니 타입입니다." });
     }
 
-    if (redis.isOpen) {
+    if (redis.isReady) {
       const cached = await readRedisCache(detailCacheKey);
       const cachedData = cached ? readResponseCachePayload(cached) : null;
       if (cachedData) {
@@ -396,13 +365,10 @@ router.get("/anime/detail/:id", async (req, res) => {
       }
     }
 
-    const cacheDuration = 24 * 60 * 60 * 1000;
-    const now = new Date();
-
     media = await Anime.findOne({ _id: animeId, contentTypes: type });
-    const isStale = !media || !media.lastSyncedAt || now - media.lastSyncedAt > cacheDuration;
+    const isDetailMissing = !media || !media.description || !media.image?.large;
 
-    if (!media || isStale) {
+    if (isDetailMissing) {
       try {
         media = await fetchDetail(queries[type], type, animeId);
       } catch (error) {
@@ -416,7 +382,7 @@ router.get("/anime/detail/:id", async (req, res) => {
 
     const localizedMedia = await localizeAnimeForResponse(media);
 
-    if (redis.isOpen && !isLikelyUntranslatedTitle(localizedMedia)) {
+    if (redis.isReady && !isLikelyUntranslatedTitle(localizedMedia)) {
       await writeRedisCache(detailCacheKey, DETAIL_CACHE_TTL_SECONDS, createResponseCachePayload(localizedMedia));
     }
 
@@ -432,7 +398,7 @@ router.get("/anime/home", async (req, res) => {
   const homeCacheKey = `anime:home:limit=${responseLimit}`;
 
   try {
-    if (redis.isOpen) {
+    if (redis.isReady) {
       const cached = await readRedisCache(homeCacheKey);
       const cachedData = cached ? readResponseCachePayload(cached) : null;
       if (cachedData) {
@@ -458,7 +424,7 @@ router.get("/anime/home", async (req, res) => {
       ova,
     };
 
-    if (redis.isOpen && !Object.values(homeData).some(hasUntranslatedTitles)) {
+    if (redis.isReady && !Object.values(homeData).some(hasUntranslatedTitles)) {
       await writeRedisCache(homeCacheKey, LIST_CACHE_TTL_SECONDS, createResponseCachePayload(homeData));
     }
 
@@ -489,7 +455,7 @@ router.get("/anime/:type", async (req, res) => {
     return res.json(data);
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "서버 오류" });
+    return res.status(err.status || 500).json({ error: err.status === 400 ? err.message : "서버 오류" });
   }
 });
 

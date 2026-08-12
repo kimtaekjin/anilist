@@ -83,7 +83,9 @@ const animeSchema = new mongoose.Schema(
       default: [],
       index: true,
     },
+    isCatalogActive: { type: Boolean, default: true, index: true },
     updatedAt: { type: Number, default: null },
+    lastCheckedAt: { type: Date, default: null, index: true },
     lastSyncedAt: { type: Date, default: null, index: true },
   },
   {
@@ -94,6 +96,7 @@ const animeSchema = new mongoose.Schema(
 animeSchema.index({ contentTypes: 1, popularity: -1, averageScore: -1 });
 animeSchema.index({ contentTypes: 1, averageScore: -1, popularity: -1 });
 animeSchema.index({ contentTypes: 1, season: 1, seasonYear: 1, popularity: -1 });
+animeSchema.index({ seasonYear: 1, season: 1, isCatalogActive: 1, popularity: -1, averageScore: -1 });
 
 const Anime = mongoose.model("Anime", animeSchema);
 

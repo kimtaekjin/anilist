@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_CLIENT_URL;
 const BROWSER_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
-const CACHE_PREFIX = "aniwiki:anime:v2";
+const CACHE_PREFIX = "aniwiki:anime:v4";
 let homeRequest = null;
 
 function isBrowser() {

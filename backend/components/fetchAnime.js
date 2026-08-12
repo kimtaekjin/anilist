@@ -1,31 +1,15 @@
 ﻿import { localizeGenre } from "../components/animeLocalization.js";
 import { translateItem } from "../components/translateItem.js";
 import Anime from "../models/anime.js";
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const ANILIST_ENDPOINT = "https://graphql.anilist.co";
+import { requestAniList } from "./anilistClient.js";
 
 const MAX_CONCURRENT_TRANSLATIONS = 1;
-const MAX_CONCURRENT_DB_UPDATES = 30;
 const MAX_PAGE_CONCURRENCY = 3;
-const REQUEST_DELAY = 1000;
-const ANILIST_REQUEST_TIMEOUT_MS = Number(process.env.ANILIST_REQUEST_TIMEOUT_MS || 10000);
 const SINGLE_BATCH_TYPES = ["trending", "completed", "ova"];
 const MAX_PAGE_BATCHES_BY_TYPE = {
   genre: Number(process.env.ANIME_GENRE_MAX_PAGE_BATCHES || 1),
   upcoming: Number(process.env.ANIME_UPCOMING_MAX_PAGE_BATCHES || 1),
 };
-const STOP_SYNC_STATUSES = [401, 403];
-
-class AniListRequestError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.name = "AniListRequestError";
-    this.status = status;
-  }
-}
-
 function getDay(airingAt) {
   const date = new Date(airingAt * 1000);
   const days = ["일", "월", "화", "수", "목", "금", "토"];
@@ -47,15 +31,15 @@ async function limitConcurrency(items, limit, asyncFn) {
   return results;
 }
 
-export async function fetchAnime(query, type, body = {}) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+export async function fetchAnime(query, type, body = {}, options = {}) {
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const year = kstNow.getUTCFullYear();
+  const month = kstNow.getUTCMonth() + 1;
   const defaultSeason = month <= 3 ? "WINTER" : month <= 6 ? "SPRING" : month <= 9 ? "SUMMER" : "FALL";
 
   let page = 1;
   let hasNextPage = true;
-  let pageBatchCount = 0;
+  let pageCount = 0;
   const allMedia = [];
 
   const variables = {
@@ -63,90 +47,39 @@ export async function fetchAnime(query, type, body = {}) {
     year: body.year || year,
   };
 
-  async function fetchPage(pageNumber, retryCount = 0) {
+  async function fetchPage(pageNumber) {
     try {
-      const response = await fetch(ANILIST_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          query,
-          variables: { ...variables, page: pageNumber },
-        }),
-        signal: AbortSignal.timeout(ANILIST_REQUEST_TIMEOUT_MS),
-      });
-
-      const json = await response.json();
-      const firstError = json.errors?.[0];
-      const errorStatus = firstError?.status || response.status;
-
-      if (json.errors?.length) {
-        const message = firstError?.message || "AniList GraphQL error";
-
-        if (errorStatus === 429 && retryCount < 5) {
-          const delay = 3000 * (retryCount + 1);
-          console.log(`Rate limited, retrying page ${pageNumber} after ${delay}ms...`);
-          await sleep(delay);
-          return fetchPage(pageNumber, retryCount + 1);
-        }
-
-        if (STOP_SYNC_STATUSES.includes(errorStatus)) {
-          throw new AniListRequestError(message, errorStatus);
-        }
-
-        console.error("AniList response error:", json);
-        return null;
-      }
-
-      const pageData = json.data?.Page;
+      const data = await requestAniList(query, { ...variables, page: pageNumber });
+      const pageData = data?.Page;
 
       if (!pageData) {
-        console.error("AniList response error:", json);
-        return null;
+        throw new Error("AniList response did not include Page data");
       }
 
       console.log(`[${type}] page: ${pageNumber}, hasNextPage: ${pageData.pageInfo?.hasNextPage}`);
       return pageData;
     } catch (error) {
-      if (error instanceof AniListRequestError) {
-        throw error;
-      }
-
-      console.error("fetch error", error);
-      return null;
+      console.error(`[${type}] page ${pageNumber} fetch failed:`, error.message);
+      throw error;
     }
   }
 
-  while (hasNextPage) {
-    pageBatchCount += 1;
+  const configuredBatchLimit = MAX_PAGE_BATCHES_BY_TYPE[type];
+  const maxPages = options.fetchAllPages
+    ? Number.POSITIVE_INFINITY
+    : SINGLE_BATCH_TYPES.includes(type)
+      ? 1
+      : configuredBatchLimit
+        ? configuredBatchLimit * MAX_PAGE_CONCURRENCY
+        : Number.POSITIVE_INFINITY;
 
-    const pageCount = SINGLE_BATCH_TYPES.includes(type) ? 1 : MAX_PAGE_CONCURRENCY;
-    const pages = [];
+  while (hasNextPage && page <= maxPages) {
+    const pageData = await fetchPage(page);
+    pageCount += 1;
+    if (pageData.media) allMedia.push(...pageData.media);
 
-    for (let i = 0; i < pageCount; i++) {
-      pages.push(page++);
-    }
-
-    const results = await Promise.all(pages.map(fetchPage));
-
-    for (const pageData of results) {
-      if (pageData?.media) allMedia.push(...pageData.media);
-    }
-
-    if (SINGLE_BATCH_TYPES.includes(type)) {
-      break;
-    }
-
-    if (MAX_PAGE_BATCHES_BY_TYPE[type] && pageBatchCount >= MAX_PAGE_BATCHES_BY_TYPE[type]) {
-      break;
-    }
-
-    const lastValidResult = [...results].reverse().find(Boolean);
-    hasNextPage = lastValidResult?.pageInfo?.hasNextPage ?? false;
-
-    await sleep(REQUEST_DELAY);
+    hasNextPage = pageData.pageInfo?.hasNextPage ?? false;
+    page += 1;
   }
 
   const uniqueMedia = Array.from(new Map(allMedia.map((anime) => [anime.id, anime])).values());
@@ -155,6 +88,57 @@ export async function fetchAnime(query, type, body = {}) {
     if (type === "trending") return anime.averageScore >= 70 && anime.popularity >= 80000;
     return true;
   });
+
+  const storedAnime = filteredMedia.length
+    ? await Anime.find({ _id: { $in: filteredMedia.map((anime) => anime.id) } })
+        .select(
+          "_id title originalTitle image season seasonYear updatedAt averageScore popularity status episodes nextAiringEpisode description characters contentTypes",
+        )
+        .lean()
+    : [];
+  const storedById = new Map(storedAnime.map((anime) => [Number(anime._id), anime]));
+
+  function hasAnimeChanged(anime) {
+    const stored = storedById.get(Number(anime.id));
+    if (!stored) return true;
+
+    const storedTitleNeedsRepair =
+      !stored.title || (!/[가-힣]/.test(stored.title) && /[\u3040-\u30ff\u3400-\u9fff]/.test(stored.title));
+    const storedListDataIsIncomplete =
+      !stored.image?.large || stored.season !== anime.season || Number(stored.seasonYear) !== Number(anime.seasonYear);
+    const storedDetailDataIsIncomplete = type === "genre" && !stored.contentTypes?.includes("detail");
+    const sourceTitleChanged =
+      String(stored.originalTitle?.romaji || "") !== String(anime.title?.romaji || "") ||
+      String(stored.originalTitle?.english || "") !== String(anime.title?.english || "") ||
+      String(stored.originalTitle?.native || "") !== String(anime.title?.native || "");
+
+    const airingAt = anime.nextAiringEpisode?.airingAt;
+    const currentEpisode =
+      anime.nextAiringEpisode?.episode !== undefined ? anime.nextAiringEpisode.episode - 1 : anime.episodes || 0;
+
+    return (
+      storedTitleNeedsRepair ||
+      storedListDataIsIncomplete ||
+      storedDetailDataIsIncomplete ||
+      sourceTitleChanged ||
+      Number(anime.updatedAt || 0) > Number(stored.updatedAt || 0) ||
+      Number(anime.averageScore || 0) !== Number(stored.averageScore || 0) ||
+      Number(anime.popularity || 0) !== Number(stored.popularity || 0) ||
+      String(anime.status || "") !== String(stored.status || "") ||
+      Number(currentEpisode) !== Number(stored.episodes || 0) ||
+      (anime.nextAiringEpisode &&
+        (Number(currentEpisode) !== Number(stored.nextAiringEpisode?.episode || 0) ||
+          Number(airingAt || 0) !== Number(stored.nextAiringEpisode?.airingAt || 0)))
+    );
+  }
+
+  const changedMedia = [];
+  const unchangedIds = [];
+
+  for (const anime of filteredMedia) {
+    if (hasAnimeChanged(anime)) changedMedia.push(anime);
+    else unchangedIds.push(anime.id);
+  }
 
   async function processAnime(anime) {
     const airingAt = anime.nextAiringEpisode?.airingAt;
@@ -166,9 +150,41 @@ export async function fetchAnime(query, type, body = {}) {
       : [];
 
     const sourceTitle = anime.title?.native || anime.title?.romaji || anime.title?.english || "";
-    const title = anime.title?.native
-      ? await translateItem(anime.title.native).catch(() => anime.title?.romaji || sourceTitle)
-      : sourceTitle;
+    const fallbackTitle = anime.title?.english || anime.title?.romaji || anime.title?.native || "";
+    const stored = storedById.get(Number(anime.id));
+    const storedTitle = stored?.title || "";
+    const sourceTitleChanged =
+      String(stored?.originalTitle?.romaji || "") !== String(anime.title?.romaji || "") ||
+      String(stored?.originalTitle?.english || "") !== String(anime.title?.english || "") ||
+      String(stored?.originalTitle?.native || "") !== String(anime.title?.native || "");
+    const translatedTitle =
+      /[가-힣]/.test(storedTitle) && !sourceTitleChanged
+        ? storedTitle
+        : anime.title?.native
+          ? await translateItem(anime.title.native).catch(() => fallbackTitle)
+          : fallbackTitle;
+    const title = /[가-힣]/.test(translatedTitle)
+      ? translatedTitle
+      : /[가-힣]/.test(storedTitle)
+        ? storedTitle
+        : fallbackTitle || sourceTitle;
+
+    const cleanDescription = anime.description ? anime.description.replace(/<[^>]*>/g, "").trim() : "";
+    const description = cleanDescription
+      ? await translateItem(cleanDescription).catch(() => cleanDescription)
+      : "줄거리 정보 없음";
+    const characters = anime.characters?.edges
+      ? await limitConcurrency(anime.characters.edges, MAX_CONCURRENT_TRANSLATIONS, async (edge) => ({
+          role: edge.role,
+          name: {
+            full: edge.node?.name?.full || "",
+            native: edge.node?.name?.native
+              ? await translateItem(edge.node.name.native).catch(() => edge.node.name.native)
+              : null,
+          },
+          image: { large: edge.node?.image?.large || null },
+        }))
+      : [];
 
     return {
       _id: anime.id,
@@ -201,31 +217,48 @@ export async function fetchAnime(query, type, body = {}) {
       averageScore: anime.averageScore || 0,
       popularity: anime.popularity || 0,
       nextAiringEpisode: anime.nextAiringEpisode ? { episode: currentEpisode, airingAt } : null,
+      ...(anime.description !== undefined
+        ? { description, trailer: anime.trailer || null, characters }
+        : {}),
       updatedAt: anime.updatedAt || null,
+      lastCheckedAt: new Date(),
       lastSyncedAt: new Date(),
     };
   }
 
-  const media = await limitConcurrency(filteredMedia, MAX_CONCURRENT_TRANSLATIONS, processAnime);
+  const media = await limitConcurrency(changedMedia, MAX_CONCURRENT_TRANSLATIONS, processAnime);
+
+  if (unchangedIds.length) {
+    const unchangedUpdate = {
+      $addToSet: {
+        contentTypes: type === "genre" ? { $each: ["genre", "detail"] } : type,
+      },
+      $set: { lastCheckedAt: new Date() },
+    };
+    if (type === "genre") unchangedUpdate.$set.isCatalogActive = true;
+
+    await Anime.updateMany(
+      { _id: { $in: unchangedIds } },
+      unchangedUpdate,
+    );
+  }
 
   if (media.length) {
     try {
       await Anime.bulkWrite(
         media.map((anime) => {
-          const { title, ...animeFields } = anime;
-          const hasKoreanTitle = /[가-힣]/.test(title);
+          if (type === "genre") anime.isCatalogActive = true;
+          const { _id, ...animeFields } = anime;
           const update = {
-            $set: hasKoreanTitle ? { ...animeFields, title } : animeFields,
-            $addToSet: { contentTypes: type },
+            $set: animeFields,
+            $addToSet: {
+              contentTypes: type === "genre" ? { $each: ["genre", "detail"] } : type,
+            },
           };
-
-          if (!hasKoreanTitle) {
-            update.$setOnInsert = { title };
-          }
 
           return {
             updateOne: {
-              filter: { _id: anime._id },
+              filter: { _id },
               update,
               upsert: true,
             },
@@ -235,10 +268,29 @@ export async function fetchAnime(query, type, body = {}) {
       );
     } catch (error) {
       console.error(`[${type}] bulk DB update failed:`, error);
+      throw error;
     }
   }
 
-  return media;
+  if (type === "genre" && options.fetchAllPages) {
+    await Anime.updateMany(
+      {
+        season: variables.season,
+        seasonYear: variables.year,
+        _id: { $nin: filteredMedia.map((anime) => anime.id) },
+      },
+      { $set: { isCatalogActive: false } },
+    );
+  }
+
+  console.log(`[${type}] 변경 ${media.length}개, 변경 없음 ${unchangedIds.length}개`);
+
+  return {
+    changedCount: media.length,
+    unchangedCount: unchangedIds.length,
+    fetchedCount: filteredMedia.length,
+    pageCount,
+  };
 }
 
 

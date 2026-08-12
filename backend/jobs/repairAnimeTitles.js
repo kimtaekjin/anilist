@@ -35,7 +35,7 @@ async function run() {
       repaired += 1;
     }
 
-    if (redis.isOpen) {
+    if (redis.isReady) {
       const keys = [];
       for await (const key of redis.scanIterator({ MATCH: "anime:*", COUNT: 100 })) {
         if (Array.isArray(key)) keys.push(...key);

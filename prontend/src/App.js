@@ -1,27 +1,31 @@
 import "./App.css";
+import { lazy, Suspense } from "react";
 import Navbar from "./Components/Navbar/Navbar";
 import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Footer from "./Components/Footer/Foorter";
-import MainPage from "./Page/MainPage/MainPage";
-import Upcoming from "./Page/MainPage/Upcoming";
-import GenreSection from "./Page/MainPage/GenreSection";
-import AnimeDetail from "./Page/DetailPage/AnimeDetail";
-import Airing from "./Page/MainPage/Airing";
-import Login from "./Page/Login/Login";
-import SingUp from "./Page/Login/SingUp";
-import Board from "./Page/BoardPage/BoardPage";
-import BoardCreatePost from "./Page/BoardPage/BoardCreatePost";
-import PostDetailPage from "./Page/BoardPage/PostDetailPage";
-import PasswordForgot from "./Page/Login/Password/Forgot";
-import ResetPassword from "./Page/Login/Password/reset";
+
+const MainPage = lazy(() => import("./Page/MainPage/MainPage"));
+const Upcoming = lazy(() => import("./Page/MainPage/Upcoming"));
+const GenreSection = lazy(() => import("./Page/MainPage/GenreSection"));
+const AnimeDetail = lazy(() => import("./Page/DetailPage/AnimeDetail"));
+const Airing = lazy(() => import("./Page/MainPage/Airing"));
+const Login = lazy(() => import("./Page/Login/Login"));
+const SingUp = lazy(() => import("./Page/Login/SingUp"));
+const Board = lazy(() => import("./Page/BoardPage/BoardPage"));
+const BoardCreatePost = lazy(() => import("./Page/BoardPage/BoardCreatePost"));
+const PostDetailPage = lazy(() => import("./Page/BoardPage/PostDetailPage"));
+const PasswordForgot = lazy(() => import("./Page/Login/Password/Forgot"));
+const ResetPassword = lazy(() => import("./Page/Login/Password/reset"));
 
 function Layout() {
   return (
     <>
       <Navbar />
       <main className="min-h-screen pt-20 text-stone-100">
-        <Outlet />
+        <Suspense fallback={<p className="py-20 text-center text-stone-300">페이지를 불러오는 중입니다.</p>}>
+          <Outlet />
+        </Suspense>
       </main>
       <Footer />
     </>

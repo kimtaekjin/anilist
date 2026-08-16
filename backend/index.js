@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import cookieParser from "cookie-parser";
+import compression from "compression";
 import "dotenv/config";
 
 import service from "./routes/service.js";
@@ -9,11 +10,24 @@ import user from "./routes/user.js";
 import post from "./routes/post.js";
 import animeComment from "./routes/animeComment.js";
 import { startAnimeSync } from "./jobs/syncAnime.js";
+import { validateEnvironment } from "./config/env.js";
+import { securityHeaders, verifyRequestOrigin } from "./middleware/security.js";
 
+validateEnvironment();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-const allowedOrigins = [process.env.CLIENT_URL, process.env.SERVER_URL].filter(Boolean);
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
+
+const configuredOrigins = [
+  process.env.CLIENT_URL,
+  ...(process.env.CORS_ORIGINS || "").split(","),
+]
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const developmentOrigins = process.env.NODE_ENV === "production" ? [] : ["http://localhost:3000"];
+const allowedOrigins = [...new Set([...configuredOrigins, ...developmentOrigins])];
 
 app.use(
   cors({
@@ -28,8 +42,11 @@ app.use(
   }),
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(securityHeaders);
+app.use(verifyRequestOrigin(allowedOrigins));
+app.use(compression());
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(cookieParser());
 
 app.use("/service", service);
@@ -53,4 +70,7 @@ mongoose
       console.log("애니 자동 동기화 비활성화: cron/job에서 npm run sync:anime로 실행하세요.");
     }
   })
-  .catch((err) => console.error("MongoDB 연결 실패", err));
+  .catch((err) => {
+    console.error("MongoDB 연결 실패", err);
+    process.exitCode = 1;
+  });

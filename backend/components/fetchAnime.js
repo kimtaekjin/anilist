@@ -92,7 +92,7 @@ export async function fetchAnime(query, type, body = {}, options = {}) {
   const storedAnime = filteredMedia.length
     ? await Anime.find({ _id: { $in: filteredMedia.map((anime) => anime.id) } })
         .select(
-          "_id title originalTitle image season seasonYear updatedAt averageScore popularity status episodes nextAiringEpisode description characters contentTypes",
+          "_id title localization originalTitle image season seasonYear updatedAt averageScore popularity status episodes nextAiringEpisode description characters contentTypes",
         )
         .lean()
     : [];
@@ -157,29 +157,33 @@ export async function fetchAnime(query, type, body = {}, options = {}) {
       String(stored?.originalTitle?.romaji || "") !== String(anime.title?.romaji || "") ||
       String(stored?.originalTitle?.english || "") !== String(anime.title?.english || "") ||
       String(stored?.originalTitle?.native || "") !== String(anime.title?.native || "");
+    const verifiedTitle = stored?.localization?.title || "";
     const translatedTitle =
-      /[가-힣]/.test(storedTitle) && !sourceTitleChanged
+      verifiedTitle
+        ? verifiedTitle
+        : /[가-힣]/.test(storedTitle) && !sourceTitleChanged
         ? storedTitle
         : anime.title?.native
-          ? await translateItem(anime.title.native).catch(() => fallbackTitle)
+          ? await translateItem(anime.title.native, { domain: "title" }).catch(() => fallbackTitle)
           : fallbackTitle;
-    const title = /[가-힣]/.test(translatedTitle)
+    const title = verifiedTitle || (/[가-힣]/.test(translatedTitle)
       ? translatedTitle
       : /[가-힣]/.test(storedTitle)
         ? storedTitle
-        : fallbackTitle || sourceTitle;
+        : fallbackTitle || sourceTitle);
 
     const cleanDescription = anime.description ? anime.description.replace(/<[^>]*>/g, "").trim() : "";
     const description = cleanDescription
-      ? await translateItem(cleanDescription).catch(() => cleanDescription)
+      ? await translateItem(cleanDescription, { domain: "synopsis" }).catch(() => cleanDescription)
       : "줄거리 정보 없음";
     const characters = anime.characters?.edges
       ? await limitConcurrency(anime.characters.edges, MAX_CONCURRENT_TRANSLATIONS, async (edge) => ({
+          anilistId: edge.node?.id || null,
           role: edge.role,
           name: {
             full: edge.node?.name?.full || "",
             native: edge.node?.name?.native
-              ? await translateItem(edge.node.name.native).catch(() => edge.node.name.native)
+              ? await translateItem(edge.node.name.native, { domain: "character" }).catch(() => edge.node.name.native)
               : null,
           },
           image: { large: edge.node?.image?.large || null },

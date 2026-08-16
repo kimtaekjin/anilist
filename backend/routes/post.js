@@ -1,11 +1,11 @@
 import express from "express";
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import dayjs from "dayjs";
 import Post from "../models/Post.js";
 import Counter from "../models/PostCounter.js";
 import redis from "../config/redis.js";
+import { optionalAuth, requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -30,34 +30,6 @@ const messages = {
   commentRequired: "댓글 내용을 입력해주세요.",
   commentDeleted: "댓글을 삭제했습니다.",
   serverError: "서버 오류가 발생했습니다.",
-};
-
-const verifyToken = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: messages.authRequired });
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: messages.invalidToken });
-  }
-};
-
-const optionalVerifyToken = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) {
-    req.user = null;
-    return next();
-  }
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-  } catch (error) {
-    req.user = null;
-  }
-
-  next();
 };
 
 function isValidId(id) {
@@ -156,10 +128,10 @@ router.get("/", async (req, res) => {
 });
 
 // 게시글 작성
-router.post("/", verifyToken, async (req, res) => {
-  const title = req.body.title?.trim();
-  const content = req.body.content?.trim();
-  const category = req.body.category?.trim() || DEFAULT_CATEGORY;
+router.post("/", requireAuth, async (req, res) => {
+  const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
+  const category = typeof req.body.category === "string" ? req.body.category.trim() || DEFAULT_CATEGORY : DEFAULT_CATEGORY;
 
   if (!title || !content || content.length < MIN_POST_CONTENT_LENGTH) {
     return res.status(400).json({ message: messages.requiredFields });
@@ -185,11 +157,11 @@ router.post("/", verifyToken, async (req, res) => {
 });
 
 // 게시글 수정
-router.put("/:id", verifyToken, async (req, res) => {
+router.put("/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const title = req.body.title?.trim();
-  const content = req.body.content?.trim();
-  const category = req.body.category?.trim();
+  const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
+  const category = typeof req.body.category === "string" ? req.body.category.trim() : "";
 
   if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
   if (!title || !content || content.length < MIN_POST_CONTENT_LENGTH) {
@@ -217,7 +189,7 @@ router.put("/:id", verifyToken, async (req, res) => {
 });
 
 // 게시글 상세
-router.get("/:id", optionalVerifyToken, async (req, res) => {
+router.get("/:id", optionalAuth, async (req, res) => {
   const { id } = req.params;
 
   if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
@@ -245,7 +217,7 @@ router.get("/:id", optionalVerifyToken, async (req, res) => {
 });
 
 // 게시글 삭제
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
 
   if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
@@ -267,9 +239,9 @@ router.delete("/:id", verifyToken, async (req, res) => {
 });
 
 // 댓글 작성
-router.post("/:id/comment", verifyToken, async (req, res) => {
+router.post("/:id/comment", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const content = req.body.content?.trim();
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
 
   if (!isValidId(id)) return res.status(400).json({ message: messages.invalidPostId });
   if (!content) return res.status(400).json({ message: messages.commentRequired });
@@ -312,7 +284,7 @@ router.get("/:id/comments", async (req, res) => {
 });
 
 // 댓글 삭제
-router.delete("/:postId/comment/:commentId", verifyToken, async (req, res) => {
+router.delete("/:postId/comment/:commentId", requireAuth, async (req, res) => {
   const { postId, commentId } = req.params;
 
   if (!isValidId(postId)) return res.status(400).json({ message: messages.invalidPostId });

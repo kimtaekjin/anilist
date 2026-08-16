@@ -151,9 +151,13 @@ export const fetchHomeAnime = async (limit = 30) => {
   }
 };
 
-export const fetchDetailAnime = async (type, id) => {
+export const fetchDetailAnime = async (type, id, options = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/service/anime/detail/${id}`, { params: { type } });
+    const response = await axios.get(`${API_URL}/service/anime/detail/${id}`, {
+      params: { type },
+      signal: options.signal,
+      timeout: 10000,
+    });
     let animeData = response.data;
 
     if (Array.isArray(animeData)) {
@@ -169,6 +173,8 @@ export const fetchDetailAnime = async (type, id) => {
 
     return animeData;
   } catch (error) {
-    console.error(error);
+    if (error.code === "ERR_CANCELED") throw error;
+    const message = error.response?.data?.message || error.message || "애니 정보를 불러오지 못했습니다.";
+    throw new Error(message);
   }
 };

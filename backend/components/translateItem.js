@@ -27,14 +27,14 @@ const inflightTranslations = new Map();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function getCacheKey(text, sourceLang, targetLang) {
-  return `${sourceLang || "auto"}:${targetLang}:${text}`;
+function getCacheKey(text, sourceLang, targetLang, domain = "general") {
+  return `${domain}:${sourceLang || "auto"}:${targetLang}:${text}`;
 }
 
-function getRedisCacheKey(text, sourceLang, targetLang) {
+function getRedisCacheKey(text, sourceLang, targetLang, domain = "general") {
   const hash = crypto
     .createHash("sha256")
-    .update(getCacheKey(text, sourceLang, targetLang))
+    .update(getCacheKey(text, sourceLang, targetLang, domain))
     .digest("hex");
 
   return `translation:${TRANSLATION_PROVIDER}:${hash}`;
@@ -116,7 +116,13 @@ function normalizeDeepLTargetLang(target) {
   return target.toUpperCase();
 }
 
-function buildDeepLRequestBody(text, source, target) {
+const TRANSLATION_CONTEXTS = {
+  title: "일본 애니메이션의 한국 정식 제목입니다. 고유명사는 의미를 직역하지 말고 한국에서 통용되는 음역을 유지하세요.",
+  synopsis: "일본 애니메이션 작품 소개 줄거리입니다. 인명과 작품 내 고유명사를 일관되게 유지하고 자연스러운 한국어 존댓말 없는 서술문으로 번역하세요.",
+  character: "일본 애니메이션 등장인물의 이름입니다. 이름의 의미를 번역하지 말고 한국어 발음으로 음역하세요.",
+};
+
+function buildDeepLRequestBody(text, source, target, domain = "general") {
   const body = {
     text: [text],
     target_lang: normalizeDeepLTargetLang(target),
@@ -126,6 +132,7 @@ function buildDeepLRequestBody(text, source, target) {
   if (sourceLang) {
     body.source_lang = sourceLang;
   }
+  if (TRANSLATION_CONTEXTS[domain]) body.context = TRANSLATION_CONTEXTS[domain];
 
   return body;
 }
@@ -134,7 +141,7 @@ function parseDeepLResponse(data, fallbackText) {
   return data?.translations?.[0]?.text || fallbackText;
 }
 
-export async function translate(text, source, target) {
+export async function translate(text, source, target, domain = "general") {
   if (!DEEPL_AUTH_KEY) {
     if (!hasLoggedMissingKey) {
       console.warn("translationAPI is not configured. Returning untranslated text.");
@@ -153,7 +160,7 @@ export async function translate(text, source, target) {
         "Content-Type": "application/json",
         Authorization: `DeepL-Auth-Key ${DEEPL_AUTH_KEY}`,
       },
-      body: JSON.stringify(buildDeepLRequestBody(text, source, target)),
+      body: JSON.stringify(buildDeepLRequestBody(text, source, target, domain)),
       signal: AbortSignal.timeout(TRANSLATION_REQUEST_TIMEOUT_MS),
     });
 
@@ -187,14 +194,14 @@ export function replaceMistranslation(translatedText) {
     .replace(/&amp;/g, "&");
 }
 
-async function findCachedTranslation(originalText, sourceLang, targetLang) {
-  const cacheKey = getCacheKey(originalText, sourceLang, targetLang);
+async function findCachedTranslation(originalText, sourceLang, targetLang, domain) {
+  const cacheKey = getCacheKey(originalText, sourceLang, targetLang, domain);
 
   if (memoryCache.has(cacheKey)) {
     return memoryCache.get(cacheKey);
   }
 
-  const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang);
+  const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang, domain);
   if (redis.isReady) {
     try {
       const cached = await redis.get(redisCacheKey);
@@ -213,7 +220,7 @@ async function findCachedTranslation(originalText, sourceLang, targetLang) {
 
   try {
     const cached = await Translation.findOne({
-      provider: TRANSLATION_PROVIDER,
+      provider: domain === "general" ? TRANSLATION_PROVIDER : `${TRANSLATION_PROVIDER}-${domain}`,
       originalText,
       sourceLang: sourceLang || "auto",
       targetLang,
@@ -238,16 +245,16 @@ async function findCachedTranslation(originalText, sourceLang, targetLang) {
   return null;
 }
 
-async function saveCachedTranslation(originalText, sourceLang, targetLang, translatedText) {
+async function saveCachedTranslation(originalText, sourceLang, targetLang, translatedText, domain) {
   if (shouldIgnoreCachedTranslation(originalText, translatedText)) {
     return;
   }
 
-  const cacheKey = getCacheKey(originalText, sourceLang, targetLang);
+  const cacheKey = getCacheKey(originalText, sourceLang, targetLang, domain);
   memoryCache.set(cacheKey, translatedText);
 
   if (redis.isReady) {
-    const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang);
+    const redisCacheKey = getRedisCacheKey(originalText, sourceLang, targetLang, domain);
     await redis.setEx(redisCacheKey, REDIS_CACHE_TTL_SECONDS, translatedText).catch((error) => {
       console.error("Translation Redis cache save failed:", error.message);
     });
@@ -260,7 +267,7 @@ async function saveCachedTranslation(originalText, sourceLang, targetLang, trans
   try {
     await Translation.updateOne(
       {
-        provider: TRANSLATION_PROVIDER,
+        provider: domain === "general" ? TRANSLATION_PROVIDER : `${TRANSLATION_PROVIDER}-${domain}`,
         originalText,
         sourceLang: sourceLang || "auto",
         targetLang,
@@ -273,19 +280,19 @@ async function saveCachedTranslation(originalText, sourceLang, targetLang, trans
   }
 }
 
-async function translateWithCache(originalText, sourceLang, targetLang) {
-  const cached = await findCachedTranslation(originalText, sourceLang, targetLang);
+async function translateWithCache(originalText, sourceLang, targetLang, domain) {
+  const cached = await findCachedTranslation(originalText, sourceLang, targetLang, domain);
   if (cached) return cached;
 
-  const cacheKey = getCacheKey(originalText, sourceLang, targetLang);
+  const cacheKey = getCacheKey(originalText, sourceLang, targetLang, domain);
   if (inflightTranslations.has(cacheKey)) {
     return inflightTranslations.get(cacheKey);
   }
 
-  const translationPromise = translate(originalText, sourceLang, targetLang)
+  const translationPromise = translate(originalText, sourceLang, targetLang, domain)
     .then((translatedText) => replaceMistranslation(translatedText))
     .then(async (translatedText) => {
-      await saveCachedTranslation(originalText, sourceLang, targetLang, translatedText);
+      await saveCachedTranslation(originalText, sourceLang, targetLang, translatedText, domain);
       return translatedText;
     })
     .finally(() => {
@@ -296,7 +303,7 @@ async function translateWithCache(originalText, sourceLang, targetLang) {
   return translationPromise;
 }
 
-export async function traslateItem(text) {
+export async function traslateItem(text, options = {}) {
   if (!text || typeof text !== "string") return "";
 
   const targetLang = "ko";
@@ -304,7 +311,7 @@ export async function traslateItem(text) {
   if (!originalText || hasKorean(originalText)) return originalText;
 
   try {
-    return await translateWithCache(originalText, getSourceLang(originalText), targetLang);
+    return await translateWithCache(originalText, getSourceLang(originalText), targetLang, options.domain || "general");
   } catch (error) {
     if (error.status !== 429 && error.status !== 456) {
       console.error("Translation failed:", error.message);

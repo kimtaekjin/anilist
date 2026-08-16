@@ -177,6 +177,7 @@ export const queries = {
           edges {
             role
             node {
+              id
               name {
                 full
                 native
@@ -246,6 +247,7 @@ export const queries = {
             edges {
               role
               node {
+                id
                 name {
                   full
                   native
@@ -316,6 +318,7 @@ export const queries = {
             edges {
               role
               node {
+                id
                 name {
                   full
                   native

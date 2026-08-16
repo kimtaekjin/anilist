@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dayjs": "^1.11.19",
@@ -11,7 +12,7 @@
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "mongoose": "^9.0.2",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^9.0.5",
     "nodemon": "^3.1.11",
     "p-limit": "^7.2.0",
     "redis": "^5.11.0"
@@ -26,7 +27,9 @@
     "backfill:anime": "node jobs/backfillAnime.js",
     "sync:anime": "node jobs/runAnimeSync.js",
     "repair:anime-titles": "node jobs/repairAnimeTitles.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "sync:ko-localization": "node jobs/syncKoreanLocalization.js",
+    "sync:ko-localization:apply": "node jobs/syncKoreanLocalization.js --apply",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

@@ -12,6 +12,7 @@
 /build
 
 .env
+dump.rdb
 
 # misc
 .DS_Store

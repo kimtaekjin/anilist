@@ -203,7 +203,7 @@ async function localizeAnimeForResponse(anime, options = {}) {
 
   if (isLikelyUntranslatedTitle(item)) {
     const sourceTitle = item.originalTitle?.native || item.originalTitle?.romaji || item.title;
-    item.title = await translateItem(sourceTitle).catch(() => item.title);
+    item.title = await translateItem(sourceTitle, { domain: "title" }).catch(() => item.title);
   }
 
   if (!Array.isArray(item.studio) || !item.studio.length) {
@@ -270,8 +270,8 @@ async function fetchDetail(query, type, id) {
   const titleText = data.title?.native || data.title?.romaji || data.title?.english || "";
 
   const [translatedTitle, translatedDescription, translatedGenres] = await Promise.all([
-    titleText ? translateItem(titleText) : "",
-    cleanDescription ? translateItem(cleanDescription) : "줄거리 정보 없음",
+    titleText ? translateItem(titleText, { domain: "title" }) : "",
+    cleanDescription ? translateItem(cleanDescription, { domain: "synopsis" }) : "줄거리 정보 없음",
     data.genres
       ? Promise.all(data.genres.map((genre) => localizeGenre(genre)))
       : [],
@@ -280,11 +280,12 @@ async function fetchDetail(query, type, id) {
   const characters = data.characters?.edges
     ? await Promise.all(
         data.characters.edges.map(async (edge) => ({
+          anilistId: edge.node?.id || null,
           role: edge.role,
           name: {
             full: edge.node.name.full,
             native: edge.node.name.native
-              ? await translateItem(edge.node.name.native).catch(() => edge.node.name.native)
+              ? await translateItem(edge.node.name.native, { domain: "character" }).catch(() => edge.node.name.native)
               : null,
           },
           image: {

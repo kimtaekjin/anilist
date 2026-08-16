@@ -39,6 +39,14 @@ const animeSchema = new mongoose.Schema(
       enum: MEDIA_TYPES,
     },
     title: { type: String, default: "", trim: true },
+    localization: {
+      title: { type: String, default: "", trim: true },
+      titleSource: { type: String, default: "", trim: true },
+      titleSourceUrl: { type: String, default: "", trim: true },
+      titleConfidence: { type: Number, default: 0, min: 0, max: 1 },
+      titleReviewedAt: { type: Date, default: null },
+      koreanArticleUrl: { type: String, default: "", trim: true },
+    },
     originalTitle: { type: titleSchema, default: () => ({}) },
     description: { type: String, default: "" },
     image: { type: imageSchema, default: () => ({}) },
@@ -63,6 +71,7 @@ const animeSchema = new mongoose.Schema(
     },
     characters: [
       {
+        anilistId: { type: Number, default: null },
         role: String,
         name: {
           full: String,

@@ -5,35 +5,46 @@ import { fetchDetailAnime } from "../../Components/items/AniListItem.jsx";
 import { AnimeDetailSkeleton } from "../../Components/items/Skeleton";
 import StarRating from "../../Components/items/StarRating";
 import AnimeComments from "./AnimeComments";
+import { getYoutubeEmbedUrl, htmlToPlainText } from "../../utils/htmlToPlainText";
 
 const AnimeDetail = () => {
   const { id } = useParams();
   const [anime, setAnime] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchAnime = async () => {
       try {
-        const translatedData = await fetchDetailAnime("detail", id);
+        setLoading(true);
+        setError("");
+        const translatedData = await fetchDetailAnime("detail", id, { signal: controller.signal });
         setAnime(translatedData);
       } catch (err) {
+        if (err.name === "CanceledError") return;
         console.error("AniList fetch error:", err);
+        setAnime(null);
+        setError(err.message || "애니 정보를 불러오지 못했습니다.");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     fetchAnime();
+    return () => controller.abort();
   }, [id]);
 
   if (loading) return <AnimeDetailSkeleton />;
 
   if (!anime) {
-    return <p className="py-20 text-center text-stone-300">데이터를 불러올 수 없습니다.</p>;
+    return <p className="py-20 text-center text-stone-300">{error || "데이터를 불러올 수 없습니다."}</p>;
   }
 
   const currentEpisode =
     anime.status === "RELEASING" && anime.nextAiringEpisode ? anime.nextAiringEpisode.episode : anime.episodes;
+  const description = htmlToPlainText(anime.description);
+  const trailerUrl = getYoutubeEmbedUrl(anime.trailer);
 
   return (
     <div className="container mx-auto px-4 py-10">
@@ -87,15 +98,15 @@ const AnimeDetail = () => {
 
       <div className="mb-8">
         <h2 className="mb-2 text-2xl font-bold text-stone-50">줄거리</h2>
-        <p className="leading-relaxed text-stone-100" dangerouslySetInnerHTML={{ __html: anime?.description }} />
+        <p className="whitespace-pre-line leading-relaxed text-stone-100">{description}</p>
       </div>
 
-      {anime?.trailer?.site === "youtube" && (
+      {trailerUrl && (
         <div className="mb-8">
           <h2 className="mb-2 text-2xl font-bold text-stone-50">트레일러</h2>
           <iframe
             className="h-96 w-full rounded-2xl"
-            src={`https://www.youtube.com/embed/${anime.trailer.id}`}
+            src={trailerUrl}
             title="Trailer"
             allowFullScreen
           />

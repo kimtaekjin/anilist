@@ -6,6 +6,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      lowercase: true,
+      unique: true,
+      index: true,
     },
     username: {
       type: String,
@@ -13,6 +16,8 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: 2,
       maxlength: 30,
+      unique: true,
+      index: true,
     },
     password: {
       type: String,
@@ -30,6 +35,11 @@ const userSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     failedLoginAttempts: {
       type: Number,

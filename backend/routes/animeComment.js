@@ -1,37 +1,14 @@
 import express from "express";
-import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import AnimeComment from "../models/AnimeComment.js";
 import AnimeCommentVote from "../models/AnimeCommentVote.js";
 import Anime from "../models/anime.js";
+import { optionalAuth, requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 30;
 const TOP_COMMENT_LIMIT = 3;
-
-function verifyToken(req, res, next) {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: "로그인이 필요합니다." });
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    return next();
-  } catch {
-    return res.status(401).json({ message: "유효하지 않은 로그인 정보입니다." });
-  }
-}
-
-function getOptionalUser(req) {
-  const token = req.cookies.token;
-  if (!token) return null;
-
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 function parseAnimeId(value) {
   const animeId = Number(value);
@@ -55,7 +32,7 @@ async function attachViewerRecommendation(comments, userId) {
   }));
 }
 
-router.get("/:animeId", async (req, res) => {
+router.get("/:animeId", optionalAuth, async (req, res) => {
   const animeId = parseAnimeId(req.params.animeId);
   if (!animeId) return res.status(400).json({ message: "올바르지 않은 애니 ID입니다." });
 
@@ -66,7 +43,7 @@ router.get("/:animeId", async (req, res) => {
     ? Math.min(Math.max(Math.floor(requestedLimit), 1), MAX_PAGE_SIZE)
     : DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * limit;
-  const viewer = getOptionalUser(req);
+  const viewer = req.user;
 
   try {
     const topComments = await AnimeComment.find({ animeId, recommendCount: { $gt: 0 } })
@@ -100,9 +77,9 @@ router.get("/:animeId", async (req, res) => {
   }
 });
 
-router.post("/:animeId", verifyToken, async (req, res) => {
+router.post("/:animeId", requireAuth, async (req, res) => {
   const animeId = parseAnimeId(req.params.animeId);
-  const content = req.body.content?.trim();
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
 
   if (!animeId) return res.status(400).json({ message: "올바르지 않은 애니 ID입니다." });
   if (!content) return res.status(400).json({ message: "댓글 내용을 입력해주세요." });
@@ -125,7 +102,7 @@ router.post("/:animeId", verifyToken, async (req, res) => {
   }
 });
 
-router.delete("/:animeId/:commentId", verifyToken, async (req, res) => {
+router.delete("/:animeId/:commentId", requireAuth, async (req, res) => {
   const animeId = parseAnimeId(req.params.animeId);
   const { commentId } = req.params;
 
@@ -170,7 +147,7 @@ function validateRecommendationParams(req, res) {
   return { animeId, commentId };
 }
 
-router.put("/:animeId/:commentId/recommend", verifyToken, async (req, res) => {
+router.put("/:animeId/:commentId/recommend", requireAuth, async (req, res) => {
   const params = validateRecommendationParams(req, res);
   if (!params) return;
   const { animeId, commentId } = params;
@@ -211,7 +188,7 @@ router.put("/:animeId/:commentId/recommend", verifyToken, async (req, res) => {
   }
 });
 
-router.delete("/:animeId/:commentId/recommend", verifyToken, async (req, res) => {
+router.delete("/:animeId/:commentId/recommend", requireAuth, async (req, res) => {
   const params = validateRecommendationParams(req, res);
   if (!params) return;
   const { animeId, commentId } = params;

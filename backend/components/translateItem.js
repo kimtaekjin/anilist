@@ -4,6 +4,7 @@ import fetch from "node-fetch";
 import mongoose from "mongoose";
 import redis from "../config/redis.js";
 import Translation from "../models/Translate.js";
+import { needsKoreanTranslation } from "../utils/translationDetection.js";
 
 const DEEPL_AUTH_KEY = process.env.translationAPI;
 const TRANSLATION_PROVIDER = "deepl";
@@ -308,7 +309,7 @@ export async function traslateItem(text, options = {}) {
 
   const targetLang = "ko";
   const originalText = text.trim();
-  if (!originalText || hasKorean(originalText)) return originalText;
+  if (!originalText || !needsKoreanTranslation(originalText)) return originalText;
 
   try {
     return await translateWithCache(originalText, getSourceLang(originalText), targetLang, options.domain || "general");

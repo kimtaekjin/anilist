@@ -5,6 +5,7 @@ import { queries } from "../components/animeQuery.js";
 import redis from "../config/redis.js";
 import Anime from "../models/anime.js";
 import { requestAniList } from "../components/anilistClient.js";
+import { needsKoreanTranslation } from "../utils/translationDetection.js";
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ const LIST_CACHE_TTL_SECONDS = Number(process.env.ANIME_LIST_CACHE_TTL_SECONDS |
 const GENRE_CACHE_TTL_SECONDS = Number(process.env.ANIME_GENRE_CACHE_TTL_SECONDS || 60 * 60 * 24 * 30);
 const DETAIL_CACHE_TTL_SECONDS = Number(process.env.ANIME_DETAIL_CACHE_TTL_SECONDS || 60 * 60 * 24);
 const MAX_RESPONSE_LIMIT = 30;
-const RESPONSE_CACHE_VERSION = "catalog-ko-v3";
+const RESPONSE_CACHE_VERSION = "catalog-ko-v5";
 const CATALOG_START_YEAR = Number(process.env.ANIME_CATALOG_START_YEAR || 2000);
 const VALID_SEASONS = new Set(["WINTER", "SPRING", "SUMMER", "FALL"]);
 const LIST_RESPONSE_FIELDS = [
@@ -194,6 +195,14 @@ function hasUntranslatedTitles(data) {
   return data.some((anime) => isLikelyUntranslatedTitle(anime));
 }
 
+function hasUntranslatedDetail(anime) {
+  if (needsKoreanTranslation(anime?.description)) return true;
+
+  return (anime?.characters || []).some((character) =>
+    needsKoreanTranslation(character?.name?.native),
+  );
+}
+
 async function localizeAnimeForResponse(anime, options = {}) {
   const item = anime.toObject ? anime.toObject() : { ...anime };
 
@@ -204,6 +213,28 @@ async function localizeAnimeForResponse(anime, options = {}) {
   if (isLikelyUntranslatedTitle(item)) {
     const sourceTitle = item.originalTitle?.native || item.originalTitle?.romaji || item.title;
     item.title = await translateItem(sourceTitle, { domain: "title" }).catch(() => item.title);
+  }
+
+  if (item.description) {
+    item.description = await translateItem(item.description, { domain: "synopsis" }).catch(() => item.description);
+  }
+
+  if (Array.isArray(item.characters)) {
+    item.characters = await Promise.all(
+      item.characters.map(async (character) => {
+        const localizedCharacter = character?.toObject ? character.toObject() : { ...character };
+        const nativeName = localizedCharacter.name?.native;
+
+        if (nativeName) {
+          localizedCharacter.name = {
+            ...localizedCharacter.name,
+            native: await translateItem(nativeName, { domain: "character" }).catch(() => nativeName),
+          };
+        }
+
+        return localizedCharacter;
+      }),
+    );
   }
 
   if (!Array.isArray(item.studio) || !item.studio.length) {
@@ -383,7 +414,11 @@ router.get("/anime/detail/:id", async (req, res) => {
 
     const localizedMedia = await localizeAnimeForResponse(media);
 
-    if (redis.isReady && !isLikelyUntranslatedTitle(localizedMedia)) {
+    if (
+      redis.isReady &&
+      !isLikelyUntranslatedTitle(localizedMedia) &&
+      !hasUntranslatedDetail(localizedMedia)
+    ) {
       await writeRedisCache(detailCacheKey, DETAIL_CACHE_TTL_SECONDS, createResponseCachePayload(localizedMedia));
     }
 

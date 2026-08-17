@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeEmail, validateEmail, validatePassword, validateUsername } from "../utils/userValidation.js";
 import { validateEnvironment } from "../config/env.js";
+import { needsKoreanTranslation } from "../utils/translationDetection.js";
 
 test("email is normalized and validated", () => {
   assert.equal(normalizeEmail(" User@Example.COM "), "user@example.com");
@@ -34,4 +35,11 @@ test("environment validation rejects missing or weak secrets", () => {
       JWT_SECRET: "a".repeat(32),
     }),
   );
+});
+
+test("translation detection handles English and mixed Japanese text", () => {
+  assert.equal(needsKoreanTranslation("An English anime synopsis."), true);
+  assert.equal(needsKoreanTranslation("설명: 日本語の文章"), true);
+  assert.equal(needsKoreanTranslation("이미 번역된 한국어 설명입니다."), false);
+  assert.equal(needsKoreanTranslation("한국어 설명 (TV)"), false);
 });

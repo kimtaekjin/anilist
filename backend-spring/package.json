@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-with-node-env.ps1",
+    "localize:all": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-with-node-env.ps1 -Arguments \"--localize-all --apply\""
+  }
+}

@@ -192,4 +192,20 @@ router.post("/reset-password", passwordResetLimiter, async (req, res) => {
   }
 });
 
+router.delete("/me", requireAuth, async (req, res) => {
+  const password = req.body?.password;
+  if (!validatePassword(password)) return res.status(400).json({ message: "Account deletion requires your password." });
+  try {
+    const user = await User.findById(req.user.userId).select("+password");
+    if (!user) return res.status(401).json({ message: "Login is required." });
+    if (!(await bcrypt.compare(password, user.password))) return res.status(401).json({ message: "The password is incorrect." });
+    await user.deleteOne();
+    res.clearCookie("token", getAuthCookieOptions());
+    return res.json({ message: "Account deleted." });
+  } catch (error) {
+    console.error("Account deletion failed:", error);
+    return res.status(500).json({ message: "A server error occurred." });
+  }
+});
+
 export default router;

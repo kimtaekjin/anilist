@@ -1,0 +1,9 @@
+spring:
+  main:
+    web-application-type: none
+
+app:
+  sync:
+    enabled: ${ANIME_SYNC_ENABLED:true}
+  environment: ${NODE_ENV:production}
+  redis-enabled: ${REDIS_ENABLED:true}

@@ -39,12 +39,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const deleteAccount = async (password) => {
+    const response = await axios.delete(`${API_URL}/user/me`, {
+      data: { password },
+      withCredentials: true,
+    });
+    setUser(null);
+    return response.data;
+  };
+
   const value = {
     user,
     isLogin: !!user,
     loading,
     checkAuth,
     logout,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

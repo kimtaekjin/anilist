@@ -11,7 +11,7 @@ const menuItems = [
 ];
 
 const Navbar = () => {
-  const { isLogin, logout, user } = useAuth();
+  const { isLogin, logout, deleteAccount, user } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -39,6 +39,21 @@ const Navbar = () => {
     } catch (error) {
       console.error(error);
       alert("로그아웃에 실패했습니다.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm("계정을 삭제하시겠습니까? 게시글과 댓글은 유지되며 계정만 삭제됩니다.");
+    if (!confirmed) return;
+    const password = window.prompt("계정 삭제를 확인하려면 현재 비밀번호를 입력하세요.");
+    if (!password) return;
+    try {
+      const response = await deleteAccount(password);
+      alert(response?.message || "계정이 삭제되었습니다.");
+      setMenuOpen(false);
+      navigate("/");
+    } catch (error) {
+      alert(error.response?.data?.message || "계정 삭제에 실패했습니다.");
     }
   };
 
@@ -76,6 +91,12 @@ const Navbar = () => {
               >
                 로그아웃
               </button>
+              <button
+                className="rounded-md border border-red-400/40 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10"
+                onClick={handleDeleteAccount}
+              >
+                계정 삭제
+              </button>
             </>
           ) : (
             <>
@@ -109,6 +130,12 @@ const Navbar = () => {
                     onClick={handleLogout}
                   >
                     로그아웃
+                  </button>
+                  <button
+                    className="rounded-md border border-red-400/40 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                    onClick={handleDeleteAccount}
+                  >
+                    계정 삭제
                   </button>
                 </>
               ) : (

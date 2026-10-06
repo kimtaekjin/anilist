@@ -1,6 +1,37 @@
 spring:
   application:
     name: anilist-backend
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      connect-timeout: 500ms
+      timeout: 500ms
+    mongodb:
+      uri: ${MONGO_URI:mongodb://127.0.0.1:27017/anilist}
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASS:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 server:
   port: ${PORT:8080}
+  compression:
+    enabled: true
+
+app:
+  environment: ${NODE_ENV:development}
+  jwt-secret: ${JWT_SECRET:}
+  client-url: ${CLIENT_URL:http://localhost:3000}
+  cors-origins: ${CORS_ORIGINS:}
+  redis-enabled: ${REDIS_ENABLED:false}
+  initialize-indexes: ${MONGO_INITIALIZE_INDEXES:true}
+  sync:
+    enabled: ${ANIME_SYNC_ENABLED:false}
+    cron: ${ANIME_SYNC_CRON:0 0 0 * * *}

@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.time.Instant;
@@ -20,6 +21,8 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 @Service
 public class UserService {
     private static final String LOGIN_ERROR = "이메일 또는 비밀번호가 올바르지 않습니다.";
+    private static final String DELETED_USER_ID = "deleted-user";
+    private static final String DELETED_AUTHOR = "탈퇴한 사용자";
     private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder(12);
     private final UserRepository users;
     private final MongoTemplate mongo;
@@ -96,12 +99,55 @@ public class UserService {
                         .set("updatedAt", new Date()), FindAndModifyOptions.options().returnNew(true), Document.class, "users");
         if (changed == null) throw new ApiException(400, "토큰이 유효하지 않거나 만료되었습니다.");
     }
+    @Transactional(transactionManager = "mongoTransactionManager")
     public void deleteAccount(String userId, Map<String, Object> body) {
         String password = Inputs.password(body);
-        if (!validPassword(password)) throw new ApiException(400, "Account deletion requires your password.");
-        UserAccount user = users.findById(userId).orElseThrow(() -> new ApiException(401, "Login is required."));
-        if (!passwords.matches(password, user.password())) throw new ApiException(401, "The password is incorrect.");
+        if (password.isBlank() || password.getBytes(StandardCharsets.UTF_8).length > 72)
+            throw new ApiException(400, "탈퇴하려면 현재 비밀번호를 입력해 주세요.");
+
+        UserAccount user = users.findById(userId)
+                .orElseThrow(() -> new ApiException(401, "로그인이 필요합니다."));
+        if (!passwords.matches(password, user.password()))
+            throw new ApiException(401, "비밀번호가 올바르지 않습니다.");
+
+        anonymizeAuthoredContent(userId);
+        removeVotesAndRecount(userId);
         mongo.remove(query(where("_id").is(new ObjectId(userId))), "users");
+    }
+
+    private void anonymizeAuthoredContent(String userId) {
+        Update postAuthor = new Update()
+                .set("userId", DELETED_USER_ID)
+                .set("author", DELETED_AUTHOR);
+        mongo.updateMulti(query(where("userId").is(userId)), postAuthor, "posts");
+
+        Update postComments = new Update()
+                .set("comments.$[comment].userId", DELETED_USER_ID)
+                .set("comments.$[comment].author", DELETED_AUTHOR)
+                .filterArray(where("comment.userId").is(userId));
+        mongo.updateMulti(query(where("comments.userId").is(userId)), postComments, "posts");
+
+        Update animeComments = new Update()
+                .set("userId", DELETED_USER_ID)
+                .set("author", DELETED_AUTHOR);
+        mongo.updateMulti(query(where("userId").is(userId)), animeComments, "animecomments");
+    }
+
+    private void removeVotesAndRecount(String userId) {
+        Query userVotes = query(where("userId").is(userId));
+        Set<ObjectId> affectedComments = mongo.find(userVotes, Document.class, "animecommentvotes").stream()
+                .map(vote -> vote.get("commentId"))
+                .filter(ObjectId.class::isInstance)
+                .map(ObjectId.class::cast)
+                .collect(java.util.stream.Collectors.toSet());
+
+        mongo.remove(userVotes, "animecommentvotes");
+
+        for (ObjectId commentId : affectedComments) {
+            long count = mongo.count(query(where("commentId").is(commentId)), "animecommentvotes");
+            mongo.updateFirst(query(where("_id").is(commentId)),
+                    new Update().set("recommendCount", count).set("updatedAt", new Date()), "animecomments");
+        }
     }
 
     public static String sha256(String value) {

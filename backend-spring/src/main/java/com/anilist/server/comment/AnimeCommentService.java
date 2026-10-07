@@ -9,8 +9,10 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.util.*;
 import java.util.stream.Collectors;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
@@ -21,7 +23,12 @@ public class AnimeCommentService {
     private static final String COMMENTS = "animecomments", VOTES = "animecommentvotes";
     private final DocumentStore store;
     private final AnimeRepository anime;
-    public AnimeCommentService(DocumentStore store, AnimeRepository anime) { this.store = store; this.anime = anime; }
+    private final TransactionTemplate transactions;
+    public AnimeCommentService(DocumentStore store, AnimeRepository anime, MongoTransactionManager transactionManager) {
+        this.store = store;
+        this.anime = anime;
+        this.transactions = new TransactionTemplate(transactionManager);
+    }
     private void validAnime(int id) { Inputs.require(id > 0, "올바르지 않은 애니 ID입니다."); }
     public Object list(int animeId, String requestedPage, String requestedLimit, AuthUser viewer) {
         validAnime(animeId);
@@ -53,50 +60,58 @@ public class AnimeCommentService {
     }
     public Object delete(int animeId, String commentId, AuthUser user) {
         validAnime(animeId); ObjectId id = Inputs.objectId(commentId);
-        Document deleted = store.remove(COMMENTS, query(where("_id").is(id).and("animeId").is(animeId).and("userId").is(user.userId())));
-        if (deleted == null) {
-            if (store.find(COMMENTS, identity(animeId, id)) == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
-            throw new ApiException(403, "본인이 작성한 댓글만 삭제할 수 있습니다.");
-        }
-        store.removeMany(VOTES, query(where("commentId").is(id)));
-        return Map.of("commentId", commentId, "message", "댓글을 삭제했습니다.");
+        return transactions.execute(status -> {
+            Document comment = store.find(COMMENTS, identity(animeId, id));
+            if (comment == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
+            if (!user.userId().equals(comment.getString("userId")) && !user.admin())
+                throw new ApiException(403, "본인이 작성한 댓글만 삭제할 수 있습니다.");
+
+            Document deleted = store.remove(COMMENTS, identity(animeId, id));
+            if (deleted == null) throw new ApiException(409, "댓글 상태가 변경되었습니다. 다시 시도해 주세요.");
+            store.removeMany(VOTES, query(where("commentId").is(id)));
+            return Map.of("commentId", commentId, "message", "댓글을 삭제했습니다.");
+        });
     }
     public Object recommend(int animeId, String commentId, AuthUser user, boolean recommend) {
         validAnime(animeId); ObjectId id = Inputs.objectId(commentId);
+        try {
+            return transactions.execute(status -> recommendInTransaction(animeId, commentId, id, user, recommend));
+        } catch (DuplicateKeyException duplicate) {
+            // A concurrent identical recommendation won the unique-key race.
+            Document latest = store.find(COMMENTS, identity(animeId, id));
+            if (latest == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
+            return voteResponse(commentId, true, latest);
+        }
+    }
+    private Object recommendInTransaction(int animeId, String commentId, ObjectId id, AuthUser user, boolean recommend) {
         Document current = store.find(COMMENTS, identity(animeId, id));
         if (current == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
+
         Query voteQuery = query(where("commentId").is(id).and("userId").is(user.userId()));
-        Document vote = new Document("commentId", id).append("userId", user.userId())
-                .append("createdAt", new Date()).append("updatedAt", new Date());
+        Document existingVote = store.find(VOTES, voteQuery);
+
         if (recommend) {
-            try { store.insert(VOTES, vote); }
-            catch (DuplicateKeyException duplicate) {
-                Document latest = store.find(COMMENTS, identity(animeId, id));
-                if (latest == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
-                return voteResponse(commentId, true, latest);
-            }
-            try {
-                Document updated = store.update(COMMENTS, identity(animeId, id),
-                        new Update().inc("recommendCount", 1).set("updatedAt", new Date()), false);
-                if (updated == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
-                return voteResponse(commentId, true, updated);
-            } catch (RuntimeException failure) { store.remove(VOTES, voteQuery); throw failure; }
+            if (existingVote != null) return voteResponse(commentId, true, current);
+            store.insert(VOTES, new Document("commentId", id).append("userId", user.userId())
+                    .append("createdAt", new Date()).append("updatedAt", new Date()));
+            Document updated = store.update(COMMENTS, identity(animeId, id),
+                    new Update().inc("recommendCount", 1).set("updatedAt", new Date()), false);
+            if (updated == null) throw new ApiException(409, "댓글 상태가 변경되었습니다. 다시 시도해 주세요.");
+            return voteResponse(commentId, true, updated);
         }
-        Document removed = store.remove(VOTES, voteQuery);
-        if (removed == null) return voteResponse(commentId, false, current);
-        try {
-            // Protect legacy/inconsistent counters from going negative.
-            Document updated = store.update(COMMENTS, query(where("_id").is(id).and("animeId").is(animeId).and("recommendCount").gt(0)),
-                    new Update().inc("recommendCount", -1).set("updatedAt", new Date()), false);
-            if (updated == null) updated = store.find(COMMENTS, identity(animeId, id));
-            if (updated == null) throw new ApiException(404, "댓글을 찾을 수 없습니다.");
-            return voteResponse(commentId, false, updated);
-        } catch (RuntimeException failure) {
-            if (!(failure instanceof ApiException)) {
-                try { store.insert(VOTES, removed); } catch (DuplicateKeyException ignored) { }
-            }
-            throw failure;
+
+        if (existingVote == null) return voteResponse(commentId, false, current);
+        store.remove(VOTES, voteQuery);
+        Document updated = store.update(COMMENTS,
+                query(where("_id").is(id).and("animeId").is(animeId).and("recommendCount").gt(0)),
+                new Update().inc("recommendCount", -1).set("updatedAt", new Date()), false);
+        if (updated == null) {
+            // Legacy inconsistent data may already have a zero counter. Keep it at zero while removing the vote.
+            updated = store.update(COMMENTS, identity(animeId, id),
+                    new Update().set("recommendCount", 0).set("updatedAt", new Date()), false);
         }
+        if (updated == null) throw new ApiException(409, "댓글 상태가 변경되었습니다. 다시 시도해 주세요.");
+        return voteResponse(commentId, false, updated);
     }
     private Query identity(int animeId, ObjectId id) { return query(where("_id").is(id).and("animeId").is(animeId)); }
     private Map<String, Object> decorate(Document document, boolean recommended) {

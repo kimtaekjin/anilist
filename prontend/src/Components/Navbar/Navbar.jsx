@@ -43,7 +43,9 @@ const Navbar = () => {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm("계정을 삭제하시겠습니까? 게시글과 댓글은 유지되며 계정만 삭제됩니다.");
+    const confirmed = window.confirm(
+      "계정을 삭제하시겠습니까? 이메일과 로그인 정보는 삭제되고, 게시글과 댓글은 '탈퇴한 사용자'로 익명화되어 유지됩니다. 탈퇴 후에는 해당 콘텐츠를 수정하거나 삭제할 수 없습니다.",
+    );
     if (!confirmed) return;
     const password = window.prompt("계정 삭제를 확인하려면 현재 비밀번호를 입력하세요.");
     if (!password) return;

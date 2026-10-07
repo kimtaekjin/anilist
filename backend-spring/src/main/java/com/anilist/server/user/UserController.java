@@ -56,6 +56,6 @@ public class UserController {
         var user = auth.require(request);
         users.deleteAccount(user.userId(), body);
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO))
-                .body(Map.of("message", "Account deleted."));
+                .body(Map.of("message", "회원 탈퇴가 완료되었습니다. 작성한 콘텐츠는 익명화되어 유지됩니다."));
     }
 }

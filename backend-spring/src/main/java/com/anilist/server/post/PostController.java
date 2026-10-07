@@ -31,10 +31,20 @@ public class PostController {
         posts.delete(id, auth.require(request)); return Map.of("message", "게시글을 삭제했습니다.");
     }
     @GetMapping("/{id}/comments")
-    public Object comments(@PathVariable String id) { return posts.listComments(id); }
+    public Object comments(@PathVariable String id, HttpServletRequest request) {
+        return posts.listComments(id, auth.optional(request));
+    }
     @PostMapping("/{id}/comment")
     public ResponseEntity<?> addComment(@PathVariable String id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
         return ResponseEntity.status(201).body(posts.addComment(id, body, auth.require(request)));
+    }
+    @PutMapping("/{postId}/comment/{commentId}/recommend")
+    public Object recommendComment(@PathVariable String postId, @PathVariable String commentId, HttpServletRequest request) {
+        return posts.recommendComment(postId, commentId, auth.require(request), true);
+    }
+    @DeleteMapping("/{postId}/comment/{commentId}/recommend")
+    public Object cancelCommentRecommendation(@PathVariable String postId, @PathVariable String commentId, HttpServletRequest request) {
+        return posts.recommendComment(postId, commentId, auth.require(request), false);
     }
     @DeleteMapping("/{postId}/comment/{commentId}")
     public Object deleteComment(@PathVariable String postId, @PathVariable String commentId, HttpServletRequest request) {

@@ -131,22 +131,28 @@ public class UserService {
                 .set("userId", DELETED_USER_ID)
                 .set("author", DELETED_AUTHOR);
         mongo.updateMulti(query(where("userId").is(userId)), animeComments, "animecomments");
+        mongo.updateMulti(query(where("userId").is(userId)), animeComments, "postcomments");
     }
 
     private void removeVotesAndRecount(String userId) {
+        removeVotesAndRecount(userId, "animecommentvotes", "animecomments");
+        removeVotesAndRecount(userId, "postcommentvotes", "postcomments");
+    }
+
+    private void removeVotesAndRecount(String userId, String voteCollection, String commentCollection) {
         Query userVotes = query(where("userId").is(userId));
-        Set<ObjectId> affectedComments = mongo.find(userVotes, Document.class, "animecommentvotes").stream()
+        Set<ObjectId> affectedComments = mongo.find(userVotes, Document.class, voteCollection).stream()
                 .map(vote -> vote.get("commentId"))
                 .filter(ObjectId.class::isInstance)
                 .map(ObjectId.class::cast)
                 .collect(java.util.stream.Collectors.toSet());
 
-        mongo.remove(userVotes, "animecommentvotes");
+        mongo.remove(userVotes, voteCollection);
 
         for (ObjectId commentId : affectedComments) {
-            long count = mongo.count(query(where("commentId").is(commentId)), "animecommentvotes");
+            long count = mongo.count(query(where("commentId").is(commentId)), voteCollection);
             mongo.updateFirst(query(where("_id").is(commentId)),
-                    new Update().set("recommendCount", count).set("updatedAt", new Date()), "animecomments");
+                    new Update().set("recommendCount", count).set("updatedAt", new Date()), commentCollection);
         }
     }
 

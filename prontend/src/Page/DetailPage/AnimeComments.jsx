@@ -1,12 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { Crown, ThumbsUp, Trash2 } from "lucide-react";
+import { CornerDownRight, Crown, MessageCircleReply, ThumbsUp, Trash2, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import Pagination from "../../Components/Pagination/Pagination";
 
 const PAGE_SIZE = 10;
 
-function CommentCard({ comment, featured, onRecommend, recommending, canDelete, onDelete, deleting }) {
+function CommentActions({ comment, onRecommend, recommending, canDelete, onDelete, deleting, onReply, allowReply }) {
+  if (comment.deleted) return null;
+  return <div className="flex shrink-0 items-center gap-2">
+    {allowReply && <button type="button" onClick={onReply}
+      className="inline-flex items-center gap-1 text-xs font-bold text-stone-400 transition hover:text-amber-200">
+      <MessageCircleReply size={14} /> 답글
+    </button>}
+    {canDelete && <button type="button" disabled={deleting || recommending} onClick={() => onDelete(comment._id)}
+      className="inline-flex items-center gap-1 rounded-full border border-stone-100/15 px-3 py-1 text-xs font-bold text-stone-400 transition hover:border-red-400/50 hover:text-red-200 disabled:opacity-50">
+      <Trash2 size={14} /> 삭제
+    </button>}
+    <button type="button" disabled={recommending || deleting} onClick={() => onRecommend(comment._id)}
+      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition disabled:opacity-50 ${comment.recommended ? "border-red-400/50 bg-red-500/15 text-red-200" : "border-stone-100/15 text-stone-400 hover:border-red-400/50 hover:text-red-200"}`}>
+      <ThumbsUp size={14} /> 추천 {comment.recommendCount || 0}
+    </button>
+  </div>;
+}
+
+function CommentCard({ comment, featured, onRecommend, recommendingId, user, isAdmin, onDelete, deletingId,
+  replyingTo, onReply, replyContent, setReplyContent, submitReply, replySubmitting, cancelReply }) {
   return (
     <article
       className={`rounded-xl border p-4 ${
@@ -22,34 +41,33 @@ function CommentCard({ comment, featured, onRecommend, recommending, canDelete, 
           </time>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {canDelete && (
-            <button
-              type="button"
-              disabled={deleting || recommending}
-              onClick={() => onDelete(comment._id)}
-              className="inline-flex items-center gap-1 rounded-full border border-stone-100/15 px-3 py-1 text-xs font-bold text-stone-400 transition hover:border-red-400/50 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Trash2 size={14} />
-              삭제
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={recommending || deleting}
-            onClick={() => onRecommend(comment._id)}
-            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              comment.recommended
-                ? "border-red-400/50 bg-red-500/15 text-red-200"
-                : "border-stone-100/15 text-stone-400 hover:border-red-400/50 hover:text-red-200"
-            }`}
-          >
-            <ThumbsUp size={14} />
-            추천 {comment.recommendCount || 0}
-          </button>
-        </div>
+        <CommentActions comment={comment} onRecommend={onRecommend} recommending={recommendingId === comment._id}
+          canDelete={user?.userId === comment.userId || isAdmin} onDelete={onDelete} deleting={deletingId === comment._id}
+          allowReply onReply={() => onReply(comment._id)} />
       </div>
-      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-200">{comment.content}</p>
+      <p className={`whitespace-pre-wrap break-words text-sm leading-6 ${comment.deleted ? "italic text-stone-500" : "text-stone-200"}`}>
+        {comment.deleted ? "삭제된 댓글입니다." : comment.content}
+      </p>
+      {(comment.replies || []).map((reply) => <div key={reply._id} className="mt-3 ml-3 flex gap-2 border-l border-stone-100/10 bg-black/10 px-3 py-3 sm:ml-8">
+        <CornerDownRight size={15} className="mt-1 shrink-0 text-amber-400/70" />
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-stone-500"><strong className="text-stone-300">{reply.author}</strong> · {new Date(reply.createdAt).toLocaleString("ko-KR")}</p>
+            <CommentActions comment={reply} onRecommend={onRecommend} recommending={recommendingId === reply._id}
+              canDelete={user?.userId === reply.userId || isAdmin} onDelete={onDelete} deleting={deletingId === reply._id} />
+          </div>
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-200">{reply.content}</p>
+        </div>
+      </div>)}
+      {replyingTo === comment._id && <form onSubmit={submitReply} className="mt-3 border-t border-stone-100/10 pt-3">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold text-amber-200"><span>{comment.author}님에게 답글 작성</span>
+          <button type="button" onClick={cancelReply} className="text-stone-400 hover:text-white"><X size={15} /></button></div>
+        <div className="flex flex-col gap-2 sm:flex-row"><textarea autoFocus maxLength={1000} value={replyContent}
+          onChange={(event) => setReplyContent(event.target.value)} placeholder="답글을 입력하세요."
+          className="h-20 flex-1 resize-none rounded-lg border border-stone-100/10 bg-[#10100f] p-3 text-sm text-stone-100 outline-none focus:border-amber-500" />
+          <button disabled={replySubmitting || !replyContent.trim()} className="rounded-md bg-amber-500 px-4 py-2 text-sm font-bold text-stone-950 disabled:opacity-50">
+            {replySubmitting ? "등록 중..." : "답글 등록"}</button></div>
+      </form>}
     </article>
   );
 }
@@ -67,6 +85,10 @@ export default function AnimeComments({ animeId }) {
   const [submitting, setSubmitting] = useState(false);
   const [recommendingId, setRecommendingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const isAdmin = user?.admin === true;
 
   const loadComments = useCallback(async () => {
     try {
@@ -127,7 +149,9 @@ export default function AnimeComments({ animeId }) {
 
     try {
       setRecommendingId(commentId);
-      const targetComment = [...topComments, ...comments].find((comment) => comment._id === commentId);
+      const roots = [...topComments, ...comments];
+      const targetComment = roots.find((comment) => comment._id === commentId)
+        || roots.flatMap((comment) => comment.replies || []).find((comment) => comment._id === commentId);
       const method = targetComment?.recommended ? "delete" : "put";
       await axios({
         method,
@@ -157,6 +181,29 @@ export default function AnimeComments({ animeId }) {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const submitReply = async (event) => {
+    event.preventDefault();
+    if (!user) return alert("로그인 후 답글을 작성할 수 있습니다.");
+    if (!replyContent.trim() || !replyingTo || replySubmitting) return;
+    try {
+      setReplySubmitting(true);
+      await axios.post(`${API_URL}/anime-comments/${animeId}`, {
+        content: replyContent.trim(), parentCommentId: replyingTo,
+      }, { withCredentials: true });
+      setReplyContent(""); setReplyingTo(null);
+      await loadComments();
+    } catch (requestError) {
+      alert(requestError.response?.data?.message || "답글 작성에 실패했습니다.");
+    } finally { setReplySubmitting(false); }
+  };
+
+  const commentCardProps = {
+    onRecommend: recommendComment, recommendingId, user, isAdmin, onDelete: deleteComment, deletingId,
+    replyingTo, onReply: (commentId) => { setReplyingTo(commentId); setReplyContent(""); },
+    replyContent, setReplyContent, submitReply, replySubmitting,
+    cancelReply: () => { setReplyingTo(null); setReplyContent(""); },
   };
 
   return (
@@ -194,11 +241,7 @@ export default function AnimeComments({ animeId }) {
                 key={comment._id}
                 comment={comment}
                 featured
-                onRecommend={recommendComment}
-                recommending={recommendingId === comment._id}
-                canDelete={user?.userId === comment.userId}
-                onDelete={deleteComment}
-                deleting={deletingId === comment._id}
+                {...commentCardProps}
               />
             ))}
           </div>
@@ -216,11 +259,7 @@ export default function AnimeComments({ animeId }) {
             <CommentCard
               key={comment._id}
               comment={comment}
-              onRecommend={recommendComment}
-              recommending={recommendingId === comment._id}
-              canDelete={user?.userId === comment.userId}
-              onDelete={deleteComment}
-              deleting={deletingId === comment._id}
+              {...commentCardProps}
             />
           ))}
         </div>

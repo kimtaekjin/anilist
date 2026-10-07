@@ -20,9 +20,11 @@ public class MongoIndexes implements ApplicationRunner {
         mongo.indexOps("users").ensureIndex(new Index().on("username", Direction.ASC).unique());
         mongo.indexOps("posts").ensureIndex(new Index().on("number", Direction.ASC).unique());
         mongo.indexOps("posts").ensureIndex(new Index().on("isNotice", Direction.DESC).on("number", Direction.DESC));
+        mongo.indexOps("postcomments").ensureIndex(new Index().on("postId", Direction.ASC).on("parentCommentId", Direction.ASC).on("createdAt", Direction.DESC));
+        mongo.indexOps("postcommentvotes").ensureIndex(new Index().on("commentId", Direction.ASC).on("userId", Direction.ASC).unique());
         mongo.indexOps("animecommentvotes").ensureIndex(new Index().on("commentId", Direction.ASC).on("userId", Direction.ASC).unique());
-        mongo.indexOps("animecomments").ensureIndex(new Index().on("animeId", Direction.ASC).on("recommendCount", Direction.DESC).on("createdAt", Direction.DESC));
-        mongo.indexOps("animecomments").ensureIndex(new Index().on("animeId", Direction.ASC).on("createdAt", Direction.DESC));
+        mongo.indexOps("animecomments").ensureIndex(new Index().on("animeId", Direction.ASC).on("parentCommentId", Direction.ASC).on("recommendCount", Direction.DESC).on("createdAt", Direction.DESC));
+        mongo.indexOps("animecomments").ensureIndex(new Index().on("animeId", Direction.ASC).on("parentCommentId", Direction.ASC).on("createdAt", Direction.DESC));
         mongo.indexOps("translations").ensureIndex(new Index().on("provider", Direction.ASC).on("originalText", Direction.ASC)
                 .on("sourceLang", Direction.ASC).on("targetLang", Direction.ASC).unique());
     }

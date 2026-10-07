@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
+import { CornerDownRight, MessageCircleReply, ThumbsUp, Trash2, X } from "lucide-react";
 import { PostDetailSkeleton } from "../../Components/items/Skeleton";
 
 const TEXT = {
@@ -34,6 +35,11 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [reply, setReply] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [recommendingId, setRecommendingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const isAdmin = user?.admin === true;
 
   const fetchComments = useCallback(async () => {
@@ -133,12 +139,13 @@ export default function PostDetailPage() {
     if (!ok) return;
 
     try {
+      setDeletingId(commentId);
       const res = await axios.delete(`${API_URL}/post/${id}/comment/${commentId}`, {
         withCredentials: true,
       });
 
       if (res.status === 200) {
-        setComments((prev) => prev.filter((c) => c._id !== commentId));
+        await fetchComments();
         alert(res.data.message);
       }
     } catch (error) {
@@ -147,7 +154,49 @@ export default function PostDetailPage() {
       } else {
         alert(TEXT.serverError);
       }
+    } finally { setDeletingId(null); }
+  };
+
+  const findComment = (commentId) => {
+    for (const root of comments) {
+      if (root._id === commentId) return root;
+      const found = (root.replies || []).find((item) => item._id === commentId);
+      if (found) return found;
     }
+    return null;
+  };
+
+  const handleRecommend = async (commentId) => {
+    if (!user) return alert("로그인 후 추천할 수 있습니다.");
+    if (recommendingId) return;
+    const target = findComment(commentId);
+    try {
+      setRecommendingId(commentId);
+      await axios({
+        method: target?.recommended ? "delete" : "put",
+        url: `${API_URL}/post/${id}/comment/${commentId}/recommend`,
+        withCredentials: true,
+      });
+      await fetchComments();
+    } catch (requestError) {
+      alert(requestError.response?.data?.message || "추천 처리에 실패했습니다.");
+    } finally { setRecommendingId(null); }
+  };
+
+  const handleReplySubmit = async (event) => {
+    event.preventDefault();
+    if (!user) return alert(TEXT.loginRequiredForComment);
+    if (!reply.trim() || !replyingTo || replySubmitting) return;
+    try {
+      setReplySubmitting(true);
+      await axios.post(`${API_URL}/post/${id}/comment`, {
+        content: reply.trim(), parentCommentId: replyingTo,
+      }, { withCredentials: true });
+      setReply(""); setReplyingTo(null);
+      await fetchComments();
+    } catch (requestError) {
+      alert(requestError.response?.data?.message || "답글 작성에 실패했습니다.");
+    } finally { setReplySubmitting(false); }
   };
 
   if (loading) return <PostDetailSkeleton />;
@@ -208,31 +257,73 @@ export default function PostDetailPage() {
 
         <section className="border-t border-stone-100/10 bg-[#151513] px-6 py-5">
           <h3 className="mb-4 font-bold text-stone-100">
-            {TEXT.comments} <span className="text-amber-300">{comments.length}</span>
+            {TEXT.comments} <span className="text-amber-300">{comments.reduce((count, item) => count + 1 + (item.replies?.length || 0), 0)}</span>
           </h3>
 
           <div className="mb-6 space-y-3">
             {comments.map((c) => (
-              <div
-                key={c._id}
-                className="flex items-start justify-between gap-3 rounded-md border border-stone-100/10 bg-[#10100f] p-4"
-              >
-                <div className="min-w-0">
-                  <p className="whitespace-pre-wrap text-sm leading-6 text-stone-100">{c.content}</p>
-                  <p className="mt-2 text-xs text-stone-500">
-                    {c.author} <span className="mx-1 text-stone-700">/</span> {c.createdAt}
+              <div key={c._id} className="overflow-hidden rounded-lg border border-stone-100/10 bg-[#10100f]">
+                <div className="p-4">
+                  <p className={`whitespace-pre-wrap text-sm leading-6 ${c.deleted ? "italic text-stone-500" : "text-stone-100"}`}>
+                    {c.deleted ? "삭제된 댓글입니다." : c.content}
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-stone-500">
+                      {c.author} <span className="mx-1 text-stone-700">/</span> {c.createdAt}
+                    </p>
+                    {!c.deleted && <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => { setReplyingTo(c._id); setReply(""); }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-stone-400 transition hover:text-amber-200">
+                        <MessageCircleReply size={14} /> 답글
+                      </button>
+                      <button type="button" disabled={recommendingId === c._id} onClick={() => handleRecommend(c._id)}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition ${c.recommended ? "border-red-400/50 bg-red-500/15 text-red-200" : "border-stone-100/15 text-stone-400 hover:text-red-200"}`}>
+                        <ThumbsUp size={13} /> 추천 {c.recommendCount || 0}
+                      </button>
+                      {((user && c.userId === user.userId) || isAdmin) && <button type="button"
+                        disabled={deletingId === c._id} onClick={() => handleCommentDelete(c._id, c.userId)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-red-300 transition hover:text-red-200">
+                        <Trash2 size={13} /> {TEXT.delete}
+                      </button>}
+                    </div>}
+                  </div>
                 </div>
 
-                {((user && c.userId === user.userId) || isAdmin) && (
-                  <button
-                    type="button"
-                    onClick={() => handleCommentDelete(c._id, c.userId)}
-                    className="shrink-0 text-xs font-bold text-red-300 transition hover:text-red-200"
-                  >
-                    {TEXT.delete}
-                  </button>
-                )}
+                {(c.replies || []).map((replyItem) => (
+                  <div key={replyItem._id} className="ml-5 border-t border-l border-stone-100/10 bg-stone-100/[0.025] px-4 py-3 sm:ml-10">
+                    <div className="flex gap-2"><CornerDownRight size={15} className="mt-1 shrink-0 text-amber-400/70" />
+                      <div className="min-w-0 flex-1">
+                        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-200">{replyItem.content}</p>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-stone-500">{replyItem.author} <span className="mx-1">/</span> {replyItem.createdAt}</p>
+                          <div className="flex items-center gap-2">
+                            <button type="button" disabled={recommendingId === replyItem._id} onClick={() => handleRecommend(replyItem._id)}
+                              className={`inline-flex items-center gap-1 text-xs font-bold transition ${replyItem.recommended ? "text-red-200" : "text-stone-400 hover:text-red-200"}`}>
+                              <ThumbsUp size={12} /> 추천 {replyItem.recommendCount || 0}
+                            </button>
+                            {((user && replyItem.userId === user.userId) || isAdmin) && <button type="button"
+                              disabled={deletingId === replyItem._id} onClick={() => handleCommentDelete(replyItem._id, replyItem.userId)}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-red-300"><Trash2 size={12} /> 삭제</button>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {replyingTo === c._id && <form onSubmit={handleReplySubmit} className="border-t border-stone-100/10 bg-stone-100/[0.035] p-3 sm:pl-10">
+                  <div className="mb-2 flex items-center justify-between text-xs font-bold text-amber-200">
+                    <span>{c.author}님에게 답글 작성</span>
+                    <button type="button" onClick={() => { setReplyingTo(null); setReply(""); }} className="text-stone-400 hover:text-white"><X size={15} /></button>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <textarea autoFocus maxLength={1000} value={reply} onChange={(event) => setReply(event.target.value)}
+                      className="h-20 flex-1 resize-none rounded-md border border-stone-100/10 bg-[#10100f] p-3 text-sm text-stone-100 outline-none focus:border-amber-500"
+                      placeholder="답글을 입력하세요." />
+                    <button type="submit" disabled={replySubmitting || !reply.trim()}
+                      className="rounded-md bg-amber-500 px-4 py-2 text-sm font-bold text-stone-950 disabled:opacity-50">{replySubmitting ? "등록 중..." : "답글 등록"}</button>
+                  </div>
+                </form>}
               </div>
             ))}
 

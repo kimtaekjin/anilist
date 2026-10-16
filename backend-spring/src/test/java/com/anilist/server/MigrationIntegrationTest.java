@@ -30,7 +30,8 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 
 /** Full Spring HTTP/service/repository flow against an isolated Mongo wire-protocol emulator. */
 @SpringBootTest(properties={"app.jwt-secret=test-only-secret-at-least-32-bytes-long", "app.redis-enabled=false",
-        "app.sync.enabled=false", "app.environment=development", "ANILIST_MIN_REQUEST_INTERVAL_MS=1", "ANILIST_MAX_RETRIES=0"})
+        "app.sync.enabled=false", "app.environment=development", "LOCALIZE_KO_ON_STARTUP=false",
+        "ANILIST_MIN_REQUEST_INTERVAL_MS=1", "ANILIST_MAX_RETRIES=0"})
 @AutoConfigureMockMvc
 class MigrationIntegrationTest {
     static final MongoServer DATABASE = new MongoServer(new MemoryBackend());

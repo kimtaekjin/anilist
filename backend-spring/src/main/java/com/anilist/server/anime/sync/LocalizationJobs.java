@@ -10,9 +10,13 @@ import org.springframework.boot.*;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.stereotype.Component;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
@@ -26,11 +30,19 @@ public class LocalizationJobs implements ApplicationRunner {
     private final AnimeCache cache;
     private final AnimeCatalogService catalog;
     private final long itemIntervalMs;
+    private final boolean localizeKoOnStartup;
+    private final ExecutorService startupExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "localize-ko-startup");
+        thread.setDaemon(true);
+        return thread;
+    });
     public LocalizationJobs(DocumentStore store, ExternalJsonClient http, TranslationService translations,
                             AnimeCache cache, AnimeCatalogService catalog,
-                            @org.springframework.beans.factory.annotation.Value("${LOCALIZE_ITEM_INTERVAL_MS:5000}") long itemIntervalMs) {
+                            @org.springframework.beans.factory.annotation.Value("${LOCALIZE_ITEM_INTERVAL_MS:5000}") long itemIntervalMs,
+                            @org.springframework.beans.factory.annotation.Value("${LOCALIZE_KO_ON_STARTUP:true}") boolean localizeKoOnStartup) {
         this.store = store; this.http = http; this.translations = translations; this.cache = cache; this.catalog = catalog;
         this.itemIntervalMs = Math.max(0, itemIntervalMs);
+        this.localizeKoOnStartup = localizeKoOnStartup;
     }
     @Override public void run(ApplicationArguments args) {
         String rawArgs = String.join(" ", args.getSourceArgs());
@@ -40,7 +52,24 @@ public class LocalizationJobs implements ApplicationRunner {
         if (rawArgs.contains("--repair-titles")) repair(apply);
         if (rawArgs.contains("--localize-all")) localizeAll(apply, limit);
         if (rawArgs.contains("--random-anime")) randomAnime(optionInt(args, "random-anime", 100));
+        boolean explicitJob = rawArgs.contains("--localize-ko") || rawArgs.contains("--repair-titles")
+                || rawArgs.contains("--localize-all") || rawArgs.contains("--random-anime")
+                || rawArgs.contains("--catalog-sync") || rawArgs.contains("--catalog-backfill");
+        if (localizeKoOnStartup && !explicitJob) {
+            startupExecutor.submit(() -> {
+                try {
+                    log.info("Startup Korean title localization started");
+                    wikidata(true);
+                    log.info("Startup Korean title localization completed");
+                } catch (RuntimeException failure) {
+                    log.warn("Startup Korean title localization failed: {}", failure.getMessage());
+                }
+            });
+        }
     }
+
+    @jakarta.annotation.PreDestroy
+    void shutdownStartupExecutor() { startupExecutor.shutdownNow(); }
 
     public void localizeAll(boolean apply) {
         localizeAll(apply, 0);
@@ -125,7 +154,8 @@ public class LocalizationJobs implements ApplicationRunner {
                 inserted, skipped, failed, attempts, String.format(Locale.ROOT, "%.2f", seconds));
     }
     public void wikidata(boolean apply) {
-        List<Document> anime = store.list("animes", query(where("seasonYear").gte(2000)).with(Sort.by("_id")));
+        List<Document> anime = store.list("animes", query(where("seasonYear").gte(2000)).with(Sort.by("_id")))
+                .stream().filter(candidate -> !recentlyReviewed(candidate)).toList();
         try {
             for (int offset = 0; offset < anime.size(); offset += 100) {
                 List<Document> batch = anime.subList(offset, Math.min(offset + 100, anime.size()));
@@ -135,19 +165,47 @@ public class LocalizationJobs implements ApplicationRunner {
                         + " OPTIONAL { ?koArticle schema:about ?item; schema:isPartOf <https://ko.wikipedia.org/>. } }";
                 JsonNode rows = http.get("https://query.wikidata.org/sparql?format=json&query=" + URLEncoder.encode(sparql, StandardCharsets.UTF_8))
                         .path("results").path("bindings");
+                Set<Integer> matchedIds = new HashSet<>();
                 for (JsonNode row : rows) {
                     int id = row.path("anilistId").path("value").asInt();
                     Document old = batch.stream().filter(d -> ((Number)d.get("_id")).intValue() == id).findFirst().orElse(null);
                     String title = row.path("koLabel").path("value").asText("").replaceAll("\\s+\\(애니메이션\\)$", "").trim();
                     String article = row.path("koArticle").path("value").asText("");
-                    if (old == null || title.isBlank() || title.equals(old.getString("title"))) continue;
-                    if (article.isBlank() && Objects.toString(old.getString("title"), "").matches("(?s).*[가-힣].*")) continue;
-                    log.info("Korean title {}: {} -> {} (apply={})", id, old.getString("title"), title, apply);
-                    if (apply) store.update("animes", query(where("_id").is(id)), new Update().set("title", title)
-                            .set("localization.title", title).set("localization.titleSource", "wikidata-ko")
-                            .set("localization.titleSourceUrl", row.path("item").path("value").asText(""))
-                            .set("localization.titleConfidence", article.isBlank() ? 0.9 : 1.0)
-                            .set("localization.titleReviewedAt", new Date()).set("localization.koreanArticleUrl", article), false);
+                    if (old == null) continue;
+                    matchedIds.add(id);
+                    if (title.isBlank() || title.equals(old.getString("title"))) {
+                        if (apply) store.update("animes", query(where("_id").is(id)), new Update()
+                                .set("localization.titleReviewedAt", new Date()), false);
+                        continue;
+                    }
+                    String sourceUrl = row.path("item").path("value").asText("");
+                    if (article.isBlank()) {
+                        log.info("Korean title candidate {}: {} -> {} (confidence=0.9, apply={})", id, old.getString("title"), title, apply);
+                        if (apply) store.update("animes", query(where("_id").is(id)), new Update()
+                                .set("localization.titleCandidate", title)
+                                .set("localization.titleSource", "wikidata-ko")
+                                .set("localization.titleSourceUrl", sourceUrl)
+                                .set("localization.titleConfidence", 0.9)
+                                .set("localization.titleStatus", "review")
+                                .set("localization.titleReviewedAt", new Date()), false);
+                    } else {
+                        log.info("Korean title {}: {} -> {} (confidence=1.0, apply={})", id, old.getString("title"), title, apply);
+                        if (apply) store.update("animes", query(where("_id").is(id)), new Update().set("title", title)
+                                .set("localization.title", title).set("localization.titleSource", "wikidata-ko")
+                                .set("localization.titleSourceUrl", sourceUrl)
+                                .set("localization.titleConfidence", 1.0)
+                                .set("localization.titleStatus", "approved")
+                                .set("localization.titleReviewedAt", new Date()).set("localization.koreanArticleUrl", article), false);
+                    }
+                }
+                if (apply) {
+                    for (Document old : batch) {
+                        int id = ((Number) old.get("_id")).intValue();
+                        if (!matchedIds.contains(id)) {
+                            store.update("animes", query(where("_id").is(id)),
+                                    new Update().set("localization.titleReviewedAt", new Date()), false);
+                        }
+                    }
                 }
                 ExternalJsonClient.pause(250);
             }
@@ -166,5 +224,13 @@ public class LocalizationJobs implements ApplicationRunner {
                 if (apply) store.update("animes", query(where("_id").is(anime.get("_id"))), new Update().set("title", translated), false);
             }
         } finally { if (apply) cache.invalidate(); }
+    }
+    private boolean recentlyReviewed(Document anime) {
+        Document localization = anime.get("localization", Document.class);
+        Object value = localization == null ? null : localization.get("titleReviewedAt");
+        if (!(value instanceof Date reviewedAt)) return false;
+        String status = Objects.toString(anime.getString("status"), "");
+        long days = "RELEASING".equalsIgnoreCase(status) ? 7 : 90;
+        return reviewedAt.toInstant().isAfter(Instant.now().minus(days, ChronoUnit.DAYS));
     }
 }

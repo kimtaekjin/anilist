@@ -20,6 +20,21 @@ public class MongoIndexes implements ApplicationRunner {
         mongo.indexOps("users").ensureIndex(new Index().on("username", Direction.ASC).unique());
         mongo.indexOps("posts").ensureIndex(new Index().on("number", Direction.ASC).unique());
         mongo.indexOps("posts").ensureIndex(new Index().on("isNotice", Direction.DESC).on("number", Direction.DESC));
+        mongo.indexOps("animes").ensureIndex(new Index()
+                .on("contentTypes", Direction.ASC)
+                .on("popularity", Direction.DESC)
+                .on("averageScore", Direction.DESC));
+        mongo.indexOps("animes").ensureIndex(new Index()
+                .on("contentTypes", Direction.ASC)
+                .on("season", Direction.ASC)
+                .on("seasonYear", Direction.ASC)
+                .on("popularity", Direction.DESC));
+        mongo.indexOps("animes").ensureIndex(new Index()
+                .on("seasonYear", Direction.ASC)
+                .on("season", Direction.ASC)
+                .on("isCatalogActive", Direction.ASC)
+                .on("popularity", Direction.DESC)
+                .on("averageScore", Direction.DESC));
         mongo.indexOps("postcomments").ensureIndex(new Index().on("postId", Direction.ASC).on("parentCommentId", Direction.ASC).on("createdAt", Direction.DESC));
         mongo.indexOps("postcommentvotes").ensureIndex(new Index().on("commentId", Direction.ASC).on("userId", Direction.ASC).unique());
         mongo.indexOps("animecommentvotes").ensureIndex(new Index().on("commentId", Direction.ASC).on("userId", Direction.ASC).unique());

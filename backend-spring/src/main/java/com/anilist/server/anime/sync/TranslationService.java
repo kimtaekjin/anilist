@@ -26,14 +26,20 @@ public class TranslationService {
             Map.entry("Suspense", "서스펜스"), Map.entry("Ecchi", "에치"), Map.entry("Gourmet", "미식"),
             Map.entry("Award Winning", "수상작"), Map.entry("Avant Garde", "아방가르드"));
     private final DocumentStore store; private final RedisStore redis; private final ExternalJsonClient http;
-    private final String key, endpoint; private final long interval; private long nextRequest, cooldown;
+    private final String key, endpoint, localLlmEndpoint, localLlmModel;
+    private final boolean localLlmEnabled;
+    private final long interval; private long nextRequest, cooldown;
 
     public TranslationService(DocumentStore store, RedisStore redis, ExternalJsonClient http,
             @Value("${translationAPI:}") String key, @Value("${TRANSLATION_ENDPOINT:}") String endpoint,
-            @Value("${TRANSLATION_REQUEST_INTERVAL_MS:1500}") long interval) {
+            @Value("${TRANSLATION_REQUEST_INTERVAL_MS:1500}") long interval,
+            @Value("${LOCAL_LLM_ENABLED:false}") boolean localLlmEnabled,
+            @Value("${LOCAL_LLM_ENDPOINT:http://localhost:11434/api/generate}") String localLlmEndpoint,
+            @Value("${LOCAL_LLM_MODEL:qwen2.5:7b}") String localLlmModel) {
         this.store = store; this.redis = redis; this.http = http; this.key = key;
         this.interval = Math.max(0, interval);
         this.endpoint = endpoint.isBlank() ? "https://translation.googleapis.com/language/translate/v2" : endpoint;
+        this.localLlmEnabled = localLlmEnabled; this.localLlmEndpoint = localLlmEndpoint; this.localLlmModel = localLlmModel;
     }
     private static boolean hasKorean(String text) { return text != null && text.codePoints().anyMatch(c -> c >= 0xAC00 && c <= 0xD7A3); }
     private static boolean hasJapaneseOrCjk(String text) { return text != null && text.matches("(?s).*[\\u3040-\\u30ff\\u3400-\\u9fff].*"); }
@@ -50,13 +56,34 @@ public class TranslationService {
         if (input == null) return "";
         String text = input.trim(); if (!needsTranslation(text)) return text;
         String source = hasJapaneseOrCjk(text) ? "ja" : "en";
-        String provider = domain.equals("general") ? "google" : "google-" + domain;
-        String cacheKey = "translation:google:" + UserService.sha256(domain + ":" + source + ":ko:" + text);
+        String provider = localLlmEnabled
+                ? (domain.equals("general") ? "local-llm" : "local-llm-" + domain)
+                : (domain.equals("general") ? "google" : "google-" + domain);
+        String cacheKey = "translation:" + provider + ":" + UserService.sha256(domain + ":" + source + ":ko:" + text);
         String cached = redis.get(cacheKey); if (cached != null && !cached.equals(text)) return cached;
         var lookup = query(where("provider").is(provider).and("originalText").is(text).and("sourceLang").is(source).and("targetLang").is("ko"));
         Document saved = store.find("translations", lookup);
         if (saved != null && saved.getString("translatedText") != null && !text.equals(saved.getString("translatedText"))) {
             cached = saved.getString("translatedText"); redis.put(cacheKey, cached, Duration.ofDays(1)); return cached;
+        }
+        if (localLlmEnabled) {
+            String translated = translateWithLocalLlm(text, source, domain);
+            if (translated != null && !translated.isBlank() && !translated.equals(text)) {
+                store.update("translations", lookup, new Update().set("translatedText", translated).set("updatedAt", new Date()).setOnInsert("createdAt", new Date()), true);
+                redis.put(cacheKey, translated, Duration.ofDays(1)); return translated;
+            }
+            provider = domain.equals("general") ? "google" : "google-" + domain;
+            cacheKey = "translation:" + provider + ":" + UserService.sha256(domain + ":" + source + ":ko:" + text);
+            lookup = query(where("provider").is(provider).and("originalText").is(text)
+                    .and("sourceLang").is(source).and("targetLang").is("ko"));
+            cached = redis.get(cacheKey);
+            if (cached != null && !cached.equals(text)) return cached;
+            saved = store.find("translations", lookup);
+            if (saved != null && saved.getString("translatedText") != null && !text.equals(saved.getString("translatedText"))) {
+                cached = saved.getString("translatedText");
+                redis.put(cacheKey, cached, Duration.ofDays(1));
+                return cached;
+            }
         }
         if (key.isBlank() || System.currentTimeMillis() < cooldown) return text;
         ExternalJsonClient.pause(nextRequest - System.currentTimeMillis()); nextRequest = System.currentTimeMillis() + interval;
@@ -72,5 +99,17 @@ public class TranslationService {
             }
             return translated;
         } catch (RuntimeException failure) { return text; }
+    }
+
+    private String translateWithLocalLlm(String text, String source, String domain) {
+        String prompt = "Translate from " + source + " to Korean. Domain: " + domain
+                + ". Preserve names and meaning. Return only the Korean translation, without explanation.\n\n" + text;
+        try {
+            Map<String, Object> body = Map.of("model", localLlmModel, "prompt", prompt, "stream", false,
+                    "options", Map.of("temperature", 0.1));
+            var response = http.post(localLlmEndpoint, body, Map.of());
+            if (response.status() != 200) return null;
+            return response.body().path("response").asText("").trim().replaceAll("^```\\s*|\\s*```$", "").trim();
+        } catch (RuntimeException failure) { return null; }
     }
 }

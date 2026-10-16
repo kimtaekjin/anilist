@@ -4,6 +4,8 @@ import com.anilist.server.anime.domain.AnimeDocument;
 import com.anilist.server.anime.repository.AnimeRepository;
 import com.anilist.server.anime.service.AnimeService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import java.util.stream.IntStream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AnimeController.class)
 @Import({AnimeService.class, com.anilist.server.anime.service.AnimeReadService.class})
+@Execution(ExecutionMode.SAME_THREAD)
 class AnimeHomeControllerTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private AnimeRepository repository;
@@ -60,8 +64,7 @@ class AnimeHomeControllerTest {
     @ParameterizedTest
     @CsvSource({"2,2", "2.9,2", "99,30", "0,30", "-1,30", "0.5,30", "invalid,30", "NaN,30", "Infinity,30"})
     void preservesHomeLimitBehavior(String limit, int expected) throws Exception {
-        when(repository.findByContentType(any(), any()))
-                .thenReturn(IntStream.rangeClosed(1, 35).mapToObj(this::anime).toList());
+        stubHomeAnime();
         mockMvc.perform(get("/service/anime/home").param("limit", limit))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.trending.length()").value(expected))
@@ -70,8 +73,7 @@ class AnimeHomeControllerTest {
 
     @Test
     void defaultsToThirty() throws Exception {
-        when(repository.findByContentType(any(), any()))
-                .thenReturn(IntStream.rangeClosed(1, 35).mapToObj(this::anime).toList());
+        stubHomeAnime();
         mockMvc.perform(get("/service/anime/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.trending.length()").value(30))
@@ -80,7 +82,7 @@ class AnimeHomeControllerTest {
 
     @Test
     void returnsEmptyArraysForEmptyDatabase() throws Exception {
-        when(repository.findByContentType(any(), any())).thenReturn(List.of());
+        doReturn(List.of()).when(repository).findByContentType(any(String.class), any(Sort.class));
         mockMvc.perform(get("/service/anime/home"))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"trending\":[],\"completed\":[],\"ova\":[]}"));
@@ -90,5 +92,12 @@ class AnimeHomeControllerTest {
         return new AnimeDocument(id, null, "TV", "Anime " + id, null, "", null, "", List.of(),
                 "", null, "FALL", 2026, 12, "FINISHED", 80, 100, List.of(), null,
                 List.of("trending", "completed", "ova"), true, null, List.of());
+    }
+
+    private void stubHomeAnime() {
+        List<AnimeDocument> values = IntStream.rangeClosed(1, 35).mapToObj(this::anime).toList();
+        doReturn(values).when(repository).findByContentType(eq("trending"), any(Sort.class));
+        doReturn(values).when(repository).findByContentType(eq("completed"), any(Sort.class));
+        doReturn(values).when(repository).findByContentType(eq("ova"), any(Sort.class));
     }
 }

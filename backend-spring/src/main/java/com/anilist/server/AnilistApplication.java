@@ -8,7 +8,7 @@ public class AnilistApplication {
 
     public static void main(String[] args) {
         String rawArgs = String.join(" ", args);
-        boolean job = java.util.Set.of("--catalog-sync", "--catalog-backfill", "--localize-ko", "--repair-titles", "--localize-all")
+        boolean job = java.util.Set.of("--catalog-sync", "--catalog-backfill", "--localize-ko", "--repair-titles", "--localize-all", "--random-anime")
                 .stream().anyMatch(rawArgs::contains);
         SpringApplication application = new SpringApplication(AnilistApplication.class);
         if (job) {

@@ -105,6 +105,10 @@ public class AnimeCatalogService {
         int id = media.path("id").asInt();
         if (id <= 0) throw new ApiException(502, "AniList ID가 올바르지 않습니다.");
         Document old = store.find("animes", query(where("_id").is(id)));
+        // Keep listing requests so new anime can still be discovered, but do
+        // not rewrite an existing finished anime during catalog sync. A direct
+        // detail request still bypasses this rule and may refresh the record.
+        if (old != null && !type.equals("detail") && isFinished(old)) return;
         if (unchanged(media, old, type)) {
             Update checked = new Update().set("lastCheckedAt", new Date());
             checked.addToSet("contentTypes").each(type, "detail");
@@ -117,6 +121,10 @@ public class AnimeCatalogService {
         update.setOnInsert("createdAt", new Date()).set("modifiedAt", new Date());
         update.addToSet("contentTypes").each(type, "detail");
         store.update("animes", query(where("_id").is(id)), update, true);
+    }
+
+    private boolean isFinished(Document old) {
+        return "FINISHED".equalsIgnoreCase(Objects.toString(old.getString("status"), ""));
     }
     private boolean unchanged(JsonNode media, Document old, String type) {
         if (old == null || type.equals("detail")) return false;

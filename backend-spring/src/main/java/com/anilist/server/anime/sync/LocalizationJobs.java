@@ -24,19 +24,31 @@ public class LocalizationJobs implements ApplicationRunner {
     private final ExternalJsonClient http;
     private final TranslationService translations;
     private final AnimeCache cache;
-    public LocalizationJobs(DocumentStore store, ExternalJsonClient http, TranslationService translations, AnimeCache cache) {
-        this.store = store; this.http = http; this.translations = translations; this.cache = cache;
+    private final AnimeCatalogService catalog;
+    private final long itemIntervalMs;
+    public LocalizationJobs(DocumentStore store, ExternalJsonClient http, TranslationService translations,
+                            AnimeCache cache, AnimeCatalogService catalog,
+                            @org.springframework.beans.factory.annotation.Value("${LOCALIZE_ITEM_INTERVAL_MS:5000}") long itemIntervalMs) {
+        this.store = store; this.http = http; this.translations = translations; this.cache = cache; this.catalog = catalog;
+        this.itemIntervalMs = Math.max(0, itemIntervalMs);
     }
     @Override public void run(ApplicationArguments args) {
         String rawArgs = String.join(" ", args.getSourceArgs());
         boolean apply = rawArgs.contains("--apply");
+        int limit = optionInt(args, "limit", 0);
         if (rawArgs.contains("--localize-ko")) wikidata(apply);
         if (rawArgs.contains("--repair-titles")) repair(apply);
-        if (rawArgs.contains("--localize-all")) localizeAll(apply);
+        if (rawArgs.contains("--localize-all")) localizeAll(apply, limit);
+        if (rawArgs.contains("--random-anime")) randomAnime(optionInt(args, "random-anime", 100));
     }
 
     public void localizeAll(boolean apply) {
+        localizeAll(apply, 0);
+    }
+
+    public void localizeAll(boolean apply, int limit) {
         List<Document> anime = store.list("animes", new Query().with(Sort.by("_id")));
+        if (limit > 0 && anime.size() > limit) anime = new ArrayList<>(anime.subList(0, limit));
         int processed = 0, updated = 0;
         try {
             for (Document row : anime) {
@@ -63,9 +75,54 @@ public class LocalizationJobs implements ApplicationRunner {
                 }
                 processed++;
                 if (processed % 100 == 0) log.info("Localization progress: {}/{} processed, {} updated (apply={})", processed, anime.size(), updated, apply);
+                pauseBetweenItems();
             }
         } finally { if (apply) cache.invalidate(); }
         log.info("Localization complete: {} processed, {} updated (apply={})", processed, updated, apply);
+    }
+
+    private void pauseBetweenItems() {
+        if (itemIntervalMs <= 0) return;
+        try {
+            Thread.sleep(itemIntervalMs);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Localization job interrupted", interrupted);
+        }
+    }
+
+    private int optionInt(ApplicationArguments args, String name, int fallback) {
+        if (!args.containsOption(name)) return fallback;
+        try { return Math.max(0, Integer.parseInt(args.getOptionValues(name).getFirst())); }
+        catch (RuntimeException ignored) { return fallback; }
+    }
+
+    /** Fetches random AniList details and only persists IDs not already in MongoDB. */
+    public void randomAnime(int target) {
+        int wanted = Math.max(1, Math.min(target, 100));
+        int inserted = 0, skipped = 0, failed = 0, attempts = 0;
+        Random random = new Random();
+        Set<Integer> tried = new HashSet<>();
+        long started = System.nanoTime();
+        while (inserted < wanted && attempts < wanted * 20) {
+            int id = 1 + random.nextInt(200_000);
+            if (!tried.add(id)) continue;
+            attempts++;
+            if (store.find("animes", query(where("_id").is(id))) != null) { skipped++; continue; }
+            try {
+                catalog.fetchDetail(id);
+                inserted++;
+                log.info("Random anime localization progress: {}/{} inserted, {} skipped, {} failed",
+                        inserted, wanted, skipped, failed);
+            } catch (RuntimeException failure) {
+                failed++;
+                log.debug("Random anime candidate unavailable: id={} reason={}", id, failure.getMessage());
+            }
+        }
+        cache.invalidate();
+        double seconds = (System.nanoTime() - started) / 1_000_000_000.0;
+        log.info("Random anime localization complete: inserted={} skipped={} failed={} attempts={} durationSeconds={}",
+                inserted, skipped, failed, attempts, String.format(Locale.ROOT, "%.2f", seconds));
     }
     public void wikidata(boolean apply) {
         List<Document> anime = store.list("animes", query(where("seasonYear").gte(2000)).with(Sort.by("_id")));

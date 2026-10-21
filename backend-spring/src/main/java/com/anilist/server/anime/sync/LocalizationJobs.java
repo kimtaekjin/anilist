@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.query.*;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.time.Duration;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -23,6 +24,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 
 @Component
 public class LocalizationJobs implements ApplicationRunner {
+    private static final int STARTUP_WIKIDATA_LIMIT = 100;
     private static final Logger log = LoggerFactory.getLogger(LocalizationJobs.class);
     private final DocumentStore store;
     private final ExternalJsonClient http;
@@ -59,7 +61,7 @@ public class LocalizationJobs implements ApplicationRunner {
             startupExecutor.submit(() -> {
                 try {
                     log.info("Startup Korean title localization started");
-                    wikidata(true);
+                    wikidata(true, STARTUP_WIKIDATA_LIMIT);
                     log.info("Startup Korean title localization completed");
                 } catch (RuntimeException failure) {
                     log.warn("Startup Korean title localization failed: {}", failure.getMessage());
@@ -154,8 +156,12 @@ public class LocalizationJobs implements ApplicationRunner {
                 inserted, skipped, failed, attempts, String.format(Locale.ROOT, "%.2f", seconds));
     }
     public void wikidata(boolean apply) {
+        wikidata(apply, 0);
+    }
+    private void wikidata(boolean apply, int maxItems) {
         List<Document> anime = store.list("animes", query(where("seasonYear").gte(2000)).with(Sort.by("_id")))
                 .stream().filter(candidate -> !recentlyReviewed(candidate)).toList();
+        if (maxItems > 0 && anime.size() > maxItems) anime = anime.subList(0, maxItems);
         try {
             for (int offset = 0; offset < anime.size(); offset += 100) {
                 List<Document> batch = anime.subList(offset, Math.min(offset + 100, anime.size()));
@@ -163,7 +169,7 @@ public class LocalizationJobs implements ApplicationRunner {
                 String sparql = "SELECT ?anilistId ?item ?koLabel ?koArticle WHERE { VALUES ?anilistId { " + values
                         + " } ?item wdt:P8729 ?anilistId. OPTIONAL { ?item rdfs:label ?koLabel FILTER(LANG(?koLabel) = \"ko\") }"
                         + " OPTIONAL { ?koArticle schema:about ?item; schema:isPartOf <https://ko.wikipedia.org/>. } }";
-                JsonNode rows = http.get("https://query.wikidata.org/sparql?format=json&query=" + URLEncoder.encode(sparql, StandardCharsets.UTF_8))
+                JsonNode rows = http.get("https://query.wikidata.org/sparql?format=json&query=" + URLEncoder.encode(sparql, StandardCharsets.UTF_8), Duration.ofSeconds(15))
                         .path("results").path("bindings");
                 Set<Integer> matchedIds = new HashSet<>();
                 for (JsonNode row : rows) {
@@ -180,13 +186,16 @@ public class LocalizationJobs implements ApplicationRunner {
                     }
                     String sourceUrl = row.path("item").path("value").asText("");
                     if (article.isBlank()) {
-                        log.info("Korean title candidate {}: {} -> {} (confidence=0.9, apply={})", id, old.getString("title"), title, apply);
+                        log.info("Korean title auto-selection {}: {} -> {} (confidence=0.9, apply={})", id, old.getString("title"), title, apply);
                         if (apply) store.update("animes", query(where("_id").is(id)), new Update()
-                                .set("localization.titleCandidate", title)
+                                .set("title", title)
+                                .set("localization.title", title)
                                 .set("localization.titleSource", "wikidata-ko")
                                 .set("localization.titleSourceUrl", sourceUrl)
                                 .set("localization.titleConfidence", 0.9)
-                                .set("localization.titleStatus", "review")
+                                .set("localization.titleStatus", "auto-approved")
+                                .set("localization.selectedSource", "wikidata-ko")
+                                .set("localization.selectionReason", "AniList ID와 Wikidata 항목이 직접 연결되고 한국어 label이 존재함")
                                 .set("localization.titleReviewedAt", new Date()), false);
                     } else {
                         log.info("Korean title {}: {} -> {} (confidence=1.0, apply={})", id, old.getString("title"), title, apply);
@@ -194,7 +203,9 @@ public class LocalizationJobs implements ApplicationRunner {
                                 .set("localization.title", title).set("localization.titleSource", "wikidata-ko")
                                 .set("localization.titleSourceUrl", sourceUrl)
                                 .set("localization.titleConfidence", 1.0)
-                                .set("localization.titleStatus", "approved")
+                                .set("localization.titleStatus", "auto-approved")
+                                .set("localization.selectedSource", "wikidata-wikipedia")
+                                .set("localization.selectionReason", "AniList ID 직접 연결과 한국어 Wikipedia 문서가 모두 확인됨")
                                 .set("localization.titleReviewedAt", new Date()).set("localization.koreanArticleUrl", article), false);
                     }
                 }

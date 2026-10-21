@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.data.domain.Sort;
 
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AnimeController.class)
+@TestPropertySource(properties = "ANIME_DETAIL_PRELOAD_ENABLED=false")
 @Import({AnimeService.class, com.anilist.server.anime.service.AnimeReadService.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AnimeHomeControllerTest {

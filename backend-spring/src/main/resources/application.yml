@@ -35,3 +35,11 @@ app:
   sync:
     enabled: ${ANIME_SYNC_ENABLED:false}
     cron: ${ANIME_SYNC_CRON:0 0 0 * * *}
+
+translation:
+  local-llm:
+    enabled: ${LOCAL_LLM_ENABLED:false}
+    endpoint: ${OLLAMA_ENDPOINT:http://localhost:11434/api/generate}
+    model: ${OLLAMA_MODEL:qwen2.5:7b}
+    timeout-ms: ${OLLAMA_TIMEOUT_MS:5000}
+    failure-cooldown-ms: ${OLLAMA_FAILURE_COOLDOWN_MS:60000}

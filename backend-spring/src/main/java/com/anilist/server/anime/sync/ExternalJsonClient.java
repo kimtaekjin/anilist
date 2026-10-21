@@ -14,8 +14,11 @@ public class ExternalJsonClient {
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     public ExternalJsonClient(ObjectMapper mapper) { this.mapper = mapper; }
     public Result post(String url, Object body, Map<String, String> headers) {
+        return post(url, body, headers, Duration.ofSeconds(30));
+    }
+    public Result post(String url, Object body, Map<String, String> headers, Duration timeout) {
         try {
-            var builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
+            var builder = HttpRequest.newBuilder(URI.create(url)).timeout(timeout)
                     .header("Content-Type", "application/json").header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
             headers.forEach(builder::header);
@@ -28,8 +31,11 @@ public class ExternalJsonClient {
     }
     public record Result(int status, JsonNode body, String retryAfter) {}
     public JsonNode get(String url) {
+        return get(url, Duration.ofSeconds(15));
+    }
+    public JsonNode get(String url, Duration timeout) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout)
                     .header("Accept", "application/sparql-results+json").header("User-Agent", "AniwikiLocalizationAudit/1.0").GET().build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new IllegalStateException("External GET returned " + response.statusCode());

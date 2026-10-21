@@ -18,6 +18,7 @@ import java.util.concurrent.Executors;
 /** Read-through caching and upstream fallback are separated from list selection rules. */
 @Service
 public class AnimeReadService {
+    private static final boolean DETAIL_PRELOAD_DEFAULT_ENABLED = true;
     private static final Logger log = LoggerFactory.getLogger(AnimeReadService.class);
     private final AnimeService anime;
     private final AnimeCache cache;
@@ -28,25 +29,38 @@ public class AnimeReadService {
         return thread;
     });
     private final long listTtl, detailTtl, genreTtl;
+    private final boolean detailPreloadEnabled;
     public AnimeReadService(AnimeService anime, AnimeCache cache, AnimeCatalogService catalog,
                            @Value("${ANIME_LIST_CACHE_TTL_SECONDS:86400}") long listTtl,
                            @Value("${ANIME_DETAIL_CACHE_TTL_SECONDS:86400}") long detailTtl,
-                           @Value("${ANIME_GENRE_CACHE_TTL_SECONDS:2592000}") long genreTtl) {
+                           @Value("${ANIME_GENRE_CACHE_TTL_SECONDS:2592000}") long genreTtl,
+                           @Value("${ANIME_DETAIL_PRELOAD_ENABLED:true}") boolean detailPreloadEnabled) {
         this.anime = anime; this.cache = cache; this.catalog = catalog;
         this.listTtl = listTtl; this.detailTtl = detailTtl; this.genreTtl = genreTtl;
+        this.detailPreloadEnabled = detailPreloadEnabled && DETAIL_PRELOAD_DEFAULT_ENABLED;
     }
     public AnimeDetailResponse findDetail(Integer id) {
         if (id == null || id <= 0) throw new ApiException(400, "올바르지 않은 애니 ID입니다.");
+        log.info("Anime detail request started: animeId={}", id);
         String key = cache.generation() + ":detail:" + id;
         AnimeDetailResponse result = cache.get(key, new TypeReference<>() {});
-        if (result != null) return result;
+        if (result != null) {
+            log.debug("Anime detail cache hit: animeId={}", id);
+            return result;
+        }
+        log.debug("Anime detail cache miss: animeId={}", id);
         try { result = anime.findDetail(id); } catch (AnimeNotFoundException missing) { result = null; }
         if (result == null || result.description() == null || result.description().isBlank()
                 || result.image() == null || result.image().large() == null || result.image().large().isBlank()) {
+            log.debug("Anime detail upstream fetch required: animeId={}", id);
             try { result = AnimeDetailResponse.from(catalog.fetchDetail(id)); }
-            catch (ApiException failure) { if (result == null || failure.status() < 500) throw failure; }
+            catch (ApiException failure) {
+                log.warn("Anime detail upstream fetch failed: animeId={} status={} reason={}", id, failure.status(), failure.getMessage());
+                if (result == null || failure.status() < 500) throw failure;
+            }
         }
         result = catalog.localize(result);
+        log.info("Anime detail localization completed: animeId={} resultPresent={}", id, result != null);
         if (result != null && !TranslationService.needsTranslation(result.title()) && !TranslationService.needsTranslation(result.description())
                 && result.characters().stream().noneMatch(c -> c.name() != null && TranslationService.needsTranslation(c.name().nativeTitle())))
             // fetchDetail/localize may invalidate the cache generation, so use the
@@ -87,7 +101,7 @@ public class AnimeReadService {
      * translations and writes the completed response to Redis.
      */
     private void prewarmDetails(Collection<AnimeListResponse> items) {
-        if (items == null || items.isEmpty()) return;
+        if (!detailPreloadEnabled || items == null || items.isEmpty()) return;
         for (AnimeListResponse item : items) {
             if (item == null || item.id() == null) continue;
             detailPreloader.submit(() -> {

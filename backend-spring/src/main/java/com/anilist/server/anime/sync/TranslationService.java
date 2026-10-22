@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
@@ -35,7 +36,11 @@ public class TranslationService {
     private final String key, endpoint, localLlmEndpoint, localLlmModel;
     private final boolean localLlmEnabled;
     private final long localLlmTimeoutMs, localLlmFailureCooldownMs;
-    private final long interval; private long nextRequest, cooldown, localLlmUnavailableUntil;
+    private final long interval; private long nextRequest, cooldown; private volatile long localLlmUnavailableUntil;
+
+    private final Object ollamaLock = new Object();
+    private final Object googleLock = new Object();
+    private final ConcurrentMap<String, CompletableFuture<String>> inFlight = new ConcurrentHashMap<>();
 
     public TranslationService(DocumentStore store, RedisStore redis, ExternalJsonClient http,
             @Value("${translationAPI:}") String key,
@@ -58,17 +63,46 @@ public class TranslationService {
         return hasJapaneseOrCjk(text) || (!hasKorean(text) && text.matches("(?s).*[A-Za-z].*"));
     }
     public String genre(String value) { return GENRES.containsKey(value) ? GENRES.get(value) : translate(value, "general"); }
-    public synchronized List<String> translateCharacters(List<String> names) {
+    public List<String> translateCharacters(List<String> names) {
         if (names == null || names.isEmpty()) return List.of();
         return names.stream().map(name -> translate(name == null ? "" : name.trim(), "character")).toList();
     }
-    public synchronized String translate(String input, String domain) {
+    public String translate(String input, String domain) {
+        if (input == null) return "";
+        String text = input.trim();
+        if (!needsTranslation(text)) return text;
+        String identity = cacheKey(provider(localLlmEnabled, domain), domain,
+                hasJapaneseOrCjk(text) ? "ja" : "en", text);
+        CompletableFuture<String> mine = new CompletableFuture<>();
+        CompletableFuture<String> existing = inFlight.putIfAbsent(identity, mine);
+        if (existing != null) {
+            try { return existing.get(localLlmTimeoutMs + 35000, TimeUnit.MILLISECONDS); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return text; }
+            catch (ExecutionException | TimeoutException failure) { return text; }
+        }
+        try {
+            String result = translateUncached(text, domain);
+            mine.complete(result);
+            return result;
+        } catch (RuntimeException | Error failure) {
+            mine.completeExceptionally(failure);
+            throw failure;
+        } finally { inFlight.remove(identity, mine); }
+    }
+
+    // Version the provider namespace as well as Redis keys: the existing Mongo unique
+    // index remains valid, while legacy/model-specific translations cannot collide.
+    private String provider(boolean local, String domain) {
+        String base = local ? "local-llm" : "google";
+        String revision = local ? TRANSLATION_PROMPT_VERSION + ":" + localLlmModel : "google-v1";
+        return base + ":" + domain + ":" + UserService.sha256(revision);
+    }
+
+    private String translateUncached(String input, String domain) {
         if (input == null) return "";
         String text = input.trim(); if (!needsTranslation(text)) return text;
         String source = hasJapaneseOrCjk(text) ? "ja" : "en";
-        String provider = localLlmEnabled
-                ? (domain.equals("general") ? "local-llm" : "local-llm-" + domain)
-                : (domain.equals("general") ? "google" : "google-" + domain);
+        String provider = provider(localLlmEnabled, domain);
         String cacheKey = cacheKey(provider, domain, source, text);
         String cached = redis.get(cacheKey); if (cached != null && !cached.equals(text)) return cached;
         var lookup = query(where("provider").is(provider).and("originalText").is(text).and("sourceLang").is(source).and("targetLang").is("ko"));
@@ -89,7 +123,7 @@ public class TranslationService {
                 redis.put(cacheKey, translated, Duration.ofDays(1)); return translated;
             }
             log.warn("Translation provider fallback: provider={} domain={} reason=empty-or-unchanged-response", provider, domain);
-            provider = domain.equals("general") ? "google" : "google-" + domain;
+            provider = provider(false, domain);
             cacheKey = cacheKey(provider, domain, source, text);
             lookup = query(where("provider").is(provider).and("originalText").is(text)
                     .and("sourceLang").is(source).and("targetLang").is("ko"));
@@ -102,6 +136,18 @@ public class TranslationService {
                 return cached;
             }
         }
+        synchronized (googleLock) {
+            return translateWithGoogle(text, source, domain, provider, cacheKey, lookup);
+        }
+    }
+
+    private String translateWithGoogle(String text, String source, String domain, String provider, String cacheKey,
+            org.springframework.data.mongodb.core.query.Query lookup) {
+        String cached = redis.get(cacheKey);
+        if (cached != null && !cached.equals(text)) return cached;
+        Document saved = store.find("translations", lookup);
+        if (saved != null && saved.getString("translatedText") != null && !text.equals(saved.getString("translatedText")))
+            return saved.getString("translatedText");
         if (key.isBlank() || System.currentTimeMillis() < cooldown) return text;
         ExternalJsonClient.pause(nextRequest - System.currentTimeMillis()); nextRequest = System.currentTimeMillis() + interval;
         try {
@@ -135,6 +181,10 @@ public class TranslationService {
     }
 
     private String translateWithLocalLlm(String text, String source, String domain) {
+        synchronized (ollamaLock) { return requestLocalLlm(text, source, domain); }
+    }
+
+    private String requestLocalLlm(String text, String source, String domain) {
         if (System.currentTimeMillis() < localLlmUnavailableUntil) return null;
         String prompt = buildPrompt(text, source, domain);
         try {
@@ -178,8 +228,7 @@ public class TranslationService {
     }
 
     private String cacheKey(String provider, String domain, String source, String text) {
-        String input = TRANSLATION_PROMPT_VERSION + ":" + localLlmModel + ":"
-                + domain + ":" + source + ":ko:" + text;
+        String input = domain + ":" + source + ":ko:" + text;
         return "translation:" + provider + ":" + UserService.sha256(input);
     }
 

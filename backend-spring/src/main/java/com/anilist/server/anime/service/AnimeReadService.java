@@ -12,22 +12,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.time.*;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
+import jakarta.annotation.PreDestroy;
 
 /** Read-through caching and upstream fallback are separated from list selection rules. */
 @Service
 public class AnimeReadService {
-    private static final boolean DETAIL_PRELOAD_DEFAULT_ENABLED = true;
     private static final Logger log = LoggerFactory.getLogger(AnimeReadService.class);
     private final AnimeService anime;
     private final AnimeCache cache;
     private final AnimeCatalogService catalog;
-    private final ExecutorService detailPreloader = Executors.newFixedThreadPool(2, runnable -> {
+    private final Set<Integer> pendingDetails = ConcurrentHashMap.newKeySet();
+    private final ThreadPoolExecutor detailPreloader = new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(100), runnable -> {
         Thread thread = new Thread(runnable, "anime-detail-preloader");
         thread.setDaemon(true);
         return thread;
-    });
+    }, new ThreadPoolExecutor.AbortPolicy());
     private final long listTtl, detailTtl, genreTtl;
     private final boolean detailPreloadEnabled;
     public AnimeReadService(AnimeService anime, AnimeCache cache, AnimeCatalogService catalog,
@@ -37,7 +38,7 @@ public class AnimeReadService {
                            @Value("${ANIME_DETAIL_PRELOAD_ENABLED:true}") boolean detailPreloadEnabled) {
         this.anime = anime; this.cache = cache; this.catalog = catalog;
         this.listTtl = listTtl; this.detailTtl = detailTtl; this.genreTtl = genreTtl;
-        this.detailPreloadEnabled = detailPreloadEnabled && DETAIL_PRELOAD_DEFAULT_ENABLED;
+        this.detailPreloadEnabled = detailPreloadEnabled;
     }
     public AnimeDetailResponse findDetail(Integer id) {
         if (id == null || id <= 0) throw new ApiException(400, "올바르지 않은 애니 ID입니다.");
@@ -102,17 +103,30 @@ public class AnimeReadService {
      */
     private void prewarmDetails(Collection<AnimeListResponse> items) {
         if (!detailPreloadEnabled || items == null || items.isEmpty()) return;
+        Set<Integer> ids = new LinkedHashSet<>();
         for (AnimeListResponse item : items) {
-            if (item == null || item.id() == null) continue;
-            detailPreloader.submit(() -> {
-                try {
-                    findDetail(item.id());
-                } catch (RuntimeException failure) {
-                    log.debug("Anime detail prewarm skipped: id={} reason={}", item.id(), failure.getMessage());
-                }
-            });
+            if (item != null && item.id() != null) ids.add(item.id());
         }
-        log.info("Anime detail prewarm queued: count={}", items.size());
+        for (Integer id : ids) {
+            if (!pendingDetails.add(id)) continue;
+            try {
+                detailPreloader.execute(() -> {
+                    try { findDetail(id); }
+                    catch (RuntimeException failure) {
+                        log.debug("Anime detail prewarm skipped: id={} reason={}", id, failure.getMessage());
+                    } finally { pendingDetails.remove(id); }
+                });
+            } catch (RejectedExecutionException full) {
+                pendingDetails.remove(id);
+                log.debug("Anime detail prewarm queue full; skipped id={}", id);
+            }
+        }
+    }
+
+    @PreDestroy
+    public void shutdownPreloader() {
+        detailPreloader.shutdownNow();
+        pendingDetails.clear();
     }
 
     private void prewarmHome(AnimeHomeResponse home) {

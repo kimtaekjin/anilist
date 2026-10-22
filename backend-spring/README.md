@@ -32,8 +32,13 @@ Node와 같은 포트를 쓰므로 로컬에서 동시에 실행할 경우 Sprin
 | `REDIS_URL` | `redis://localhost:6379` |
 | `MAIL_HOST`, `MAIL_PORT` | smtp.gmail.com, 587 |
 | `MAIL_USER`, `MAIL_PASS` | 비밀번호 재설정 메일 발송 설정 |
-| `translationAPI` | 기존 DeepL 키. 미설정 시 원문 유지 |
-| `TRANSLATION_ENDPOINT` | 키 종류에 따라 DeepL Free/Pro 자동 선택 |
+| `translationAPI` | Google Cloud Translation API 키. Ollama 실패 시 대체 번역에 사용하며, 키가 없으면 원문 유지 |
+| `LOCAL_LLM_ENABLED` | false; Ollama 번역 활성화 |
+| `OLLAMA_ENDPOINT` | `http://localhost:11434/api/generate` |
+| `OLLAMA_MODEL` | `qwen2.5:7b` |
+| `OLLAMA_TIMEOUT_MS` | 5000; 요청 제한시간, 최소 1000ms |
+| `OLLAMA_FAILURE_COOLDOWN_MS` | 60000; 오류 후 호출 중단 시간, 최소 1000ms |
+| `ANIME_DETAIL_PRELOAD_ENABLED` | true; 목록 조회 후 백그라운드 상세 준비 |
 | `ANIME_SYNC_ENABLED` | false; true이면 KST 자정 동기화 |
 | `ANIME_SYNC_CRON` | `0 0 0 * * *`; 기존 `ANIME_SYNC_INTERVAL_MS` 대신 사용 |
 | `ANIME_GENRE_PRECACHE_YEARS_BACK/AHEAD` | 5 / 0 |
@@ -135,10 +140,95 @@ Preview 코드는 테스트 소스에 있으므로 배포 JAR에 포함되지 �
 ## 운영 전환 시 확인할 사항
 
 - 운영 MongoDB 스키마/인덱스와 기존 bcrypt/JWT 호환 확인.
-- Redis 접속, 실제 SMTP 발송, AniList/DeepL/Wikidata 연결 검증.
+- Redis 접속, 실제 SMTP 발송, AniList/Ollama/Google Translation/Wikidata 연결 검증.
 - 운영 HTTPS 출처, 쿠키, CORS와 프록시 IP 처리 검증.
 - Spring 배포 후 프런트 API 주소 전환 및 Node 스케줄러 중복 실행 방지.
 - 문제 발생 시 프런트 API 주소를 기존 Node 서버로 되돌린다. 기존 Node 코드는 유지되어 있다.
 
 구현 참고: [Spring 비밀번호 저장](https://docs.spring.io/spring-security/reference/features/authentication/password-storage.html),
 [Spring MongoDB 원자적 갱신](https://docs.spring.io/spring-data/mongodb/reference/mongodb/template-crud-operations.html).
+
+## Ollama·번역 캐시·동시성 설계
+
+### 처리 순서와 의도
+
+`TranslationService.translate()`는 번역이 필요한 문자열만 처리한다. 같은 JVM에서 동일 번역 요청이 겹치면 `CompletableFuture` 하나를 공유한다. 다른 문자열의 캐시 조회는 외부 번역 호출을 기다리지 않는다.
+
+```text
+번역 필요 여부 확인 → 동일 요청 진행 중이면 결과 공유
+  → Redis → MongoDB translations
+  → Ollama 활성화 시 추론 (단일 동시 호출)
+  → 실패 시 Google 캐시 → Google Translation (단일 동시 호출)
+  → 둘 다 사용할 수 없으면 원문 반환
+```
+
+Ollama는 제목·캐릭터·줄거리별 프롬프트를 사용한다. `/api/generate` 요청의 핵심 옵션은 다음과 같다.
+
+```java
+Map.of("model", localLlmModel, "prompt", prompt, "stream", false,
+       "options", Map.of("temperature", 0.1, "num_predict", 1024));
+```
+
+캐릭터는 의미 번역 대신 음역, 줄거리는 요약 없이 문단을 유지하도록 지시한다. 기본 5초 제한시간은 전체 상세 API의 제한시간이 아니라 개별 Ollama HTTP 요청의 제한시간이다. 모델 로딩이 느리면 늘려야 한다. HTTP 오류·예외 후 기본 60초 동안 추론을 생략한다. 출력 검증 실패만으로는 이 대기 상태에 들어가지 않는다. 1024토큰 상한으로 긴 출력이 잘릴 수 있으며, 현재 검증은 완전한 번역 품질 평가가 아니다.
+
+### Redis와 MongoDB가 공유하는 번역 버전
+
+기존 MongoDB 고유 인덱스 `(provider, originalText, sourceLang, targetLang)`를 유지하면서 버전 충돌을 방지한다. `provider()`에서 공급자·도메인·모델·프롬프트 버전을 하나의 네임스페이스로 구성한다.
+
+```java
+String base = local ? "local-llm" : "google";
+String revision = local ? TRANSLATION_PROMPT_VERSION + ":" + localLlmModel : "google-v1";
+return base + ":" + domain + ":" + UserService.sha256(revision);
+```
+
+이 provider를 **MongoDB 조회·저장과 Redis 키에 모두** 사용한다. 따라서 Redis가 비어 있어도 다른 모델의 MongoDB 번역을 재사용하지 않는다. Google은 Ollama 모델과 독립된 버전을 사용한다. 프롬프트 의미를 변경할 때 `TRANSLATION_PROMPT_VERSION`을 올린다.
+
+- Redis 번역 TTL은 기존과 동일하게 1일이다. MongoDB 결과가 있으면 Redis를 다시 채운다.
+- 기존 provider의 데이터와 인덱스는 삭제하거나 변경하지 않는다. 이전 버전의 번역은 새 캐시로 자동 승격하지 않으며 첫 요청에서 다시 번역한다. 모델별 문서가 남으므로 저장 공간이 늘 수 있다.
+- `translationConfidence`의 0.6/0.5는 정책상 고정값이며 실제 품질 확률이 아니다.
+- 이미 한국어로 저장된 `animes` 문서나 기존 상세 응답 캐시를 일괄 재번역하지는 않는다. 모델 변경이 기존 전체 카탈로그의 재번역을 의미하지 않는다.
+
+### 전체 잠금 대신 공급자별 잠금과 동일 요청 공유
+
+```java
+CompletableFuture<String> mine = new CompletableFuture<>();
+CompletableFuture<String> existing = inFlight.putIfAbsent(identity, mine);
+// existing이 있으면 해당 결과를 대기, 소유자만 캐시 조회·추론·저장
+// finally에서 inFlight.remove(identity, mine)
+```
+
+`translate()`와 캐릭터 목록 전체의 `synchronized`를 제거했다. Ollama 호출은 `ollamaLock`, Google 호출·요청 간격·cooldown은 `googleLock`으로 각각 보호한다. 추론 동시 호출 수는 공급자당 1개를 유지해 갑작스러운 GPU/CPU 부하 증가를 피한다. Ollama 장애 시각은 `volatile`로 공유한다.
+
+중복 요청 대기는 `OLLAMA_TIMEOUT_MS + 35000ms`로 제한하며, 시간 초과·실패 시 원문을 반환한다. 인터럽트는 보존한다. 대기 요청이 시간 초과해도 원래 작업을 취소하거나 진행 중 등록을 제거하지 않으므로 중복 추론을 새로 시작하지 않는다. 공급자 잠금 대기와 여러 텍스트 번역 때문에 전체 상세 요청 시간은 개별 HTTP 제한시간보다 길 수 있다.
+
+이 제어는 **JVM 내부**에서만 유효하다. 여러 API/worker 인스턴스 전체의 호출 수 제한이나 분산 잠금은 제공하지 않는다. 사용자 요청의 우선순위도 별도로 보장하지 않는다.
+
+### 상세 미리 불러오기의 중복 제거와 부하 제한
+
+`AnimeReadService`는 홈·목록 조회 후 상세를 준비하되 다음 제한을 적용한다.
+
+```java
+new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(100), threadFactory,
+        new ThreadPoolExecutor.AbortPolicy());
+```
+
+- 홈의 trending/completed/ova와 각 목록에서 작품 ID를 중복 제거한다.
+- `pendingDetails.add(id)`에 성공한 요청만 제출한다. 같은 ID가 대기·실행 중이면 추가 제출하지 않는다.
+- 스레드 2개와 대기열 100개로 실행 중·대기 작업을 제한한다.
+- 포화 시 예외를 잡고 해당 준비 작업을 건너뛴다. `CallerRunsPolicy`를 사용하지 않아 홈 요청 스레드에서 상세 번역을 실행하지 않는다.
+- 성공·실패·제출 거부 시 pending 등록을 해제한다. 이후 목록 요청에서 다시 시도할 수 있다.
+- Spring 종료 시 `@PreDestroy`에서 실행기를 종료한다.
+
+미리 준비되지 않은 작품도 실제 상세 API 요청으로 조회할 수 있다. 부하가 높을 때는 첫 상세 응답이 더 느릴 수 있다. `ANIME_DETAIL_PRELOAD_ENABLED=false`로 미리 불러오기를 끌 수 있다. 상세 캐시의 기존 TTL·세대 키·완전히 현지화된 결과만 저장하는 조건은 유지한다.
+
+### 검증 명령
+
+```bash
+./gradlew test --tests '*TranslationConcurrencyTest' --tests '*AnimePrewarmTest' bootJar --no-daemon
+./gradlew test --no-daemon
+```
+
+회귀 테스트는 모델별 MongoDB 캐시 분리, 추론 중 별도 캐시 요청 처리, 중복 추론 억제, Ollama 장애 대기, 반복 홈 요청의 상세 작업 중복 제거와 대기열 상한을 확인한다. 실제 Ollama 모델 추론 성능·운영 MongoDB/Redis의 부하 측정은 별도 검증이 필요하다.
+
+이번 변경 검증 결과: 추가 회귀 테스트 4개 통과, `bootJar` 생성 성공. 전체 테스트는 총 44개 중 41개 통과·2개 실패·1개 건너뜀이다. 실패는 기존 `MigrationIntegrationTest`의 `animeRecommendationIsIdempotentAndScopedToAnime`, `postOwnershipCommentsAndPagination`이며, 메모리 MongoDB가 ClientSession/트랜잭션을 지원하지 않아 발생한다. 운영 MongoDB 읽기 테스트는 연결 설정이 없어 건너뛰었다. 실제 Ollama 서버를 통한 추론과 부하 측정은 이번 검증에 포함하지 않았다.

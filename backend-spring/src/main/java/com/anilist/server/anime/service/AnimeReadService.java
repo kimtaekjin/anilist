@@ -43,9 +43,9 @@ public class AnimeReadService {
     public AnimeDetailResponse findDetail(Integer id) {
         if (id == null || id <= 0) throw new ApiException(400, "올바르지 않은 애니 ID입니다.");
         log.info("Anime detail request started: animeId={}", id);
-        String key = cache.generation() + ":detail:" + id;
+        String key = cache.generation() + ":detail:ko-v2:" + id;
         AnimeDetailResponse result = cache.get(key, new TypeReference<>() {});
-        if (result != null) {
+        if (ready(result)) {
             log.debug("Anime detail cache hit: animeId={}", id);
             return result;
         }
@@ -62,11 +62,8 @@ public class AnimeReadService {
         }
         result = catalog.localize(result);
         log.info("Anime detail localization completed: animeId={} resultPresent={}", id, result != null);
-        if (result != null && !TranslationService.needsTranslation(result.title()) && !TranslationService.needsTranslation(result.description())
-                && result.characters().stream().noneMatch(c -> c.name() != null && TranslationService.needsTranslation(c.name().nativeTitle())))
-            // fetchDetail/localize may invalidate the cache generation, so use the
-            // current generation when putting the fully prepared detail response.
-            cache.put(cache.generation() + ":detail:" + id, result, detailTtl);
+        if (!ready(result)) throw new ApiException(503, "한국어 번역을 준비 중입니다. 잠시 후 다시 시도해 주세요.");
+        cache.put(cache.generation() + ":detail:ko-v2:" + id, result, detailTtl);
         return result;
     }
     public List<AnimeListResponse> findList(String type, String season, Integer year, Integer limit, Set<Integer> exclude) {
@@ -75,24 +72,24 @@ public class AnimeReadService {
         String key = cache.generation() + ":list:" + Arrays.asList(type, season, year, limit, new TreeSet<>(exclude == null ? Set.of() : exclude), today.getYear(), (today.getMonthValue()-1)/3);
         List<AnimeListResponse> result = cache.get(key, new TypeReference<>() {});
         if (result != null) {
-            prewarmDetails(result);
+            result = koreanTitles(result);
             return result;
         }
         result = anime.findList(type, season, year, limit, exclude);
+        result = koreanTitles(result);
         cache.put(key, result, "genre".equals(type) ? genreTtl : listTtl);
-        prewarmDetails(result);
         return result;
     }
     public AnimeHomeResponse findHome(String limit) {
         String key = cache.generation() + ":home:" + limit;
         AnimeHomeResponse result = cache.get(key, new TypeReference<>() {});
         if (result != null) {
-            prewarmHome(result);
+            result = koreanHome(result);
             return result;
         }
         result = anime.findHome(limit);
+        result = koreanHome(result);
         cache.put(key, result, listTtl);
-        prewarmHome(result);
         return result;
     }
 
@@ -129,12 +126,24 @@ public class AnimeReadService {
         pendingDetails.clear();
     }
 
-    private void prewarmHome(AnimeHomeResponse home) {
-        if (home == null) return;
-        List<AnimeListResponse> items = new ArrayList<>();
-        if (home.trending() != null) items.addAll(home.trending());
-        if (home.completed() != null) items.addAll(home.completed());
-        if (home.ova() != null) items.addAll(home.ova());
-        prewarmDetails(items);
+    static boolean ready(AnimeDetailResponse result) {
+        return result != null && result.title() != null && !result.title().isBlank()
+                && !TranslationService.needsTranslation(result.title())
+                && !TranslationService.needsTranslation(result.description())
+                && (result.genres() == null || result.genres().stream().noneMatch(TranslationService::needsTranslation))
+                && (result.characters() == null || result.characters().stream().noneMatch(c ->
+                        c.name() != null && TranslationService.needsTranslation(c.name().nativeTitle())));
     }
+    private List<AnimeListResponse> koreanTitles(List<AnimeListResponse> items) {
+        if (items == null) return List.of();
+        // Schedule before filtering so hidden items still have a chance to become ready.
+        prewarmDetails(items);
+        return items.stream().filter(item -> item.title() != null && !item.title().isBlank()
+                && !TranslationService.needsTranslation(item.title())
+                && (item.genres() == null || item.genres().stream().noneMatch(TranslationService::needsTranslation))).toList();
+    }
+    private AnimeHomeResponse koreanHome(AnimeHomeResponse home) {
+        return new AnimeHomeResponse(koreanTitles(home.trending()), koreanTitles(home.completed()), koreanTitles(home.ova()));
+    }
+
 }

@@ -1,0 +1,16 @@
+{
+  "storage" : "mongo-java-server in-memory via MongoDB protocol; not production MongoDB",
+  "changed" : {
+    "p95_ms" : 14.873774,
+    "translation_calls" : 50,
+    "samples" : 50,
+    "p50_ms" : 8.669431
+  },
+  "unchanged" : {
+    "p95_ms" : 0.685607,
+    "translation_calls" : 0,
+    "samples" : 200,
+    "p50_ms" : 0.480563
+  },
+  "translation" : "mock returns immediately; no inference/Redis"
+}

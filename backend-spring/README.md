@@ -232,3 +232,73 @@ new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
 회귀 테스트는 모델별 MongoDB 캐시 분리, 추론 중 별도 캐시 요청 처리, 중복 추론 억제, Ollama 장애 대기, 반복 홈 요청의 상세 작업 중복 제거와 대기열 상한을 확인한다. 실제 Ollama 모델 추론 성능·운영 MongoDB/Redis의 부하 측정은 별도 검증이 필요하다.
 
 이번 변경 검증 결과: 추가 회귀 테스트 4개 통과, `bootJar` 생성 성공. 전체 테스트는 총 44개 중 41개 통과·2개 실패·1개 건너뜀이다. 실패는 기존 `MigrationIntegrationTest`의 `animeRecommendationIsIdempotentAndScopedToAnime`, `postOwnershipCommentsAndPagination`이며, 메모리 MongoDB가 ClientSession/트랜잭션을 지원하지 않아 발생한다. 운영 MongoDB 읽기 테스트는 연결 설정이 없어 건너뛰었다. 실제 Ollama 서버를 통한 추론과 부하 측정은 이번 검증에 포함하지 않았다.
+
+## 애니 정보 완성 정책과 영속 현지화 작업
+
+### 한국어 완료 후 공개
+
+상세 API는 저장된 원문을 먼저 성공 응답으로 보내지 않는다. 제목·줄거리·캐릭터 이름·장르 현지화를 동기적으로 시도하고, 번역이 필요한 문자열이 남으면 HTTP **503**과 `한국어 번역을 준비 중입니다. 잠시 후 다시 시도해 주세요.`를 반환한다. 실패한 정보는 DB에 보관하고 재시도한다. 홈·목록에서도 번역되지 않은 제목/장르의 항목은 제외하므로 요청한 개수보다 적게 반환될 수 있다. 원문 제목(`originalTitle`)·스튜디오 등 기존 보조 데이터 계약은 유지한다. 문자 기반 번역 필요 판별은 품질 검수나 공식 제목 검증을 대신하지 않는다.
+
+새 상세 캐시에는 `detail:ko-v2` 키를 사용하고, 적중 시에도 완료 조건을 확인한다. 이전 버전의 미완성 응답 캐시가 원문 공개 정책을 우회하지 못하게 하기 위함이다. 필수 정보가 준비되지 않으면 클라이언트는 오류 상태를 표시해야 한다. 프런트엔드 코드는 이번 변경 범위에 포함하지 않았다.
+
+### 필드별 원문·완료 이력
+
+`AnimeLocalizationService`가 제목, 줄거리, 캐릭터별 이름, 미등록 장르를 관리한다. 수집 시 `descriptionOriginal`, `charactersOriginal`, `originalTitle`을 보존하며 각 번역 필드에 원문과 해시를 추가한다. 기존 DB에 원문이 없는 경우 이전 번역에서 원문을 복원하지는 못하며 다음 수집부터 보존된다.
+
+```text
+localization.fields.synopsis:
+  source / sourceHash
+  status: pending | processing | completed | failed | manual
+  translatedText / translatedAt
+  configurationRevision / preferredModel / promptVersion
+  lastErrorCode
+```
+
+원문 해시가 같고 상태가 completed이면 재번역하지 않는다. 모델을 변경했다고 완성된 작품 전체를 재번역하지 않는다. 원문이 달라지면 해당 필드만 새 작업을 만든다. `preferredModel`은 요청 설정이며 Google 대체 경로가 사용됐다는 뜻은 아니다. 실제 공급자·모델은 `translations` 캐시에 별도로 기록된다. 수동 번역은 해당 필드의 status=manual과 translatedText로 지정하며 원문 변경에도 보호한다. 수동 설정 전용 HTTP API는 추가하지 않았다.
+
+### 재시작 가능한 작업과 재시도
+
+`animeLocalizationJobs` 컬렉션의 `_id`는 작품 ID·필드·원문 해시·설정 버전으로 구성된다. 작업 등록 후 API는 즉시 처리도 시도한다. 한 번 실패했다고 요청마다 무조건 다시 번역하지 않고 nextRetryAt까지 기다린다.
+
+```java
+// MongoDB findAndModify로 처리권을 원자적으로 확보
+status in [pending, failed] && nextRetryAt <= now
+    OR status == processing && leaseUntil <= now
+```
+
+처리권은 5분 동안 유효하다. 다른 인스턴스는 같은 작업을 동시에 확보할 수 없으며, 중단된 작업은 만료 후 다시 가져간다. owner 토큰과 원문 해시를 확인해 이전 worker가 최신 필드나 수동 번역을 덮어쓰는 일을 방지한다. 캐릭터 배열 쓰기는 해당 위치의 AniList 캐릭터 ID도 확인한다. 실패는 30초, 60초, 120초 등으로 재시도 간격을 늘리고 최대 1시간으로 제한한다. 기본적으로 재시도를 계속하며 작업 기록을 자동 삭제하지 않는다. 재시도 시에는 현재 모델 설정을 사용한다.
+
+- `LOCALIZATION_RETRY_ENABLED`: 기본 true. API/worker에서 재시도 실행 여부.
+- `LOCALIZATION_RETRY_DELAY_MS`: 기본 30000. 한 배치가 끝난 후 다음 배치까지 대기시간.
+- 배치당 최대 20개를 오래된 등록 순서로 처리한다. DB에 재시도 시각·점유 만료 인덱스를 생성한다.
+- 운영에서 전용 worker를 실행하면 API의 `LOCALIZATION_RETRY_ENABLED=false`, worker는 true로 설정하는 구성을 권장한다. 다중 인스턴스의 작업 확보는 DB에서 조정하지만 Ollama 호출 개수 제한은 여전히 JVM별이다.
+- worker의 기본 운영 설정(JWT, MongoDB, Redis 등)은 기존 실행 요구사항을 따른다. 운영 DB를 사용하는 worker는 사용자가 별도로 실행해야 한다.
+- 데이터 갱신과 작업 기록은 여러 문서에 걸친 트랜잭션이 아니다. 중단 시 재시도와 원문·소유자 검사로 복구하며 정확히 한 번 실행을 보장하지 않는다. 외부 번역 호출이 재시도될 수 있다.
+
+`--localize-all --apply`와 제목 복구도 영속 필드 처리 경로를 사용한다. apply 없는 미리보기는 기존처럼 번역 캐시를 사용할 수 있지만 작품의 필드 작업을 등록하지 않는다.
+
+### 제목 우선순위와 갱신 주기
+
+`localization.titleStatus`가 manual/verified/approved이거나 titleSource=official인 제목은 Wikidata 자동 선택과 제목 복구에서 보호한다. 기존 localization.title도 일반 AniList 수집에서 유지한다. Wikidata 한국어 label은 국내 공식 서비스명으로 간주하지 않는다. 이번 변경은 새로운 국내 공식 제목 수집기를 추가하지 않는다.
+
+방영 중·예정 작품은 기존 수집 스케줄에서 변경값을 비교하고, 번역 필드는 원문 해시가 달라질 때만 다시 번역한다. 완결 작품은 목록 수집에서 lastSyncedAt 기준 30일 이내면 기존 데이터를 재사용하되 분류와 확인 시각은 갱신한다. 30일이 지나거나 상세를 직접 수집하면 재확인한다. 외부 목록 API 조회 자체를 없애는 정책은 아니다.
+
+### 관측과 검증
+
+`AnimeCache.statistics()`는 프로세스 내 캐시 hit/miss 횟수와 누적 읽기 시간을 제공한다. worker는 배치 시도 수와 소요시간을 로그로 남긴다. 이는 실제 부하 테스트 결과가 아니며 서버 재시작 시 통계는 초기화된다.
+
+```bash
+./gradlew test --tests '*AnimeLocalizationServiceTest' --tests '*AnimeHomeControllerTest' --tests '*CatalogServiceTest' bootJar --no-daemon
+```
+
+회귀 테스트는 변경 원문만 재번역, 실패 시 재시도 지연, 새 서비스 인스턴스에서 작업 복구, 만료된 점유 복구, 동시 확보 방지, 수동 번역 보호를 MongoDB 프로토콜 기반 메모리 DB로 확인한다. 운영 MongoDB·Ollama의 성능과 분산 장애는 별도 환경에서 검증해야 한다.
+
+스케줄러 풀은 2개 스레드로 설정해 긴 카탈로그 cron 작업 하나가 현지화 재시도 스케줄을 모두 막지 않도록 했다. 작업 완료 상태·이력은 DB 기록이며, 현재 원문의 번역이 실패하면 이전 원문의 번역으로 조용히 대체하지 않는다.
+
+기존 번역 캐시도 결과 검증을 통과해야 재사용한다. 한국어 번역이 필요한 영문·일문 결과가 남아 있으면 성공 캐시로 취급하지 않고 공급자 호출을 다시 시도한다. Google 응답에도 같은 검증을 적용해 실패한 원문이 성공 번역으로 고정되는 것을 막는다.
+
+이 변경의 전체 검증: 54개 중 51개 통과, 기존 트랜잭션 관련 실패 2개, 운영 DB 테스트 1개 건너뜀. 신규 테스트 10개는 통과했다. JAR 생성도 성공했다. 실제 Ollama 추론·운영 MongoDB 복제 세트·다중 서버 장애 실험과 부하 측정은 실행하지 않았다.
+
+### 로컬 성능 비교 기록
+
+[측정 조건·결과·재실행 방법](docs/performance/RESULTS.md)에 변경 전/이전 커밋/현재 작업 트리 비교와 원시 표본을 기록했다. 모의 추론 중 캐시 대기와 큐 적재량은 줄었지만, 포화 상태의 작업 제출 CPU 비용은 증가했다. 실제 Ollama 추론·운영 부하 개선율은 연결 가능한 테스트 환경이 없어 미측정이다.

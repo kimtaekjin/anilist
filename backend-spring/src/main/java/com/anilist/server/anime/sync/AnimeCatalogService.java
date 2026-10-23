@@ -1,6 +1,7 @@
 package com.anilist.server.anime.sync;
 
 import com.anilist.server.anime.domain.AnimeDocument;
+import com.anilist.server.anime.localization.AnimeLocalizationService;
 import com.anilist.server.anime.dto.AnimeDetailResponse;
 import com.anilist.server.anime.repository.AnimeRepository;
 import com.anilist.server.anime.service.AnimeCache;
@@ -33,10 +34,11 @@ public class AnimeCatalogService {
     private final MongoTemplate mongo;
     private final AnimeRepository repository;
     private final AnimeCache cache;
+    private final AnimeLocalizationService localization;
     public AnimeCatalogService(AniListClient client, TranslationService translations, DocumentStore store,
-                               MongoTemplate mongo, AnimeRepository repository, AnimeCache cache) {
+                               MongoTemplate mongo, AnimeRepository repository, AnimeCache cache, AnimeLocalizationService localization) {
         this.client = client; this.translations = translations; this.store = store;
-        this.mongo = mongo; this.repository = repository; this.cache = cache;
+        this.mongo = mongo; this.repository = repository; this.cache = cache; this.localization = localization;
     }
     public AnimeDocument fetchDetail(int id) {
         JsonNode media = client.request("query($id:Int!){Media(id:$id,type:ANIME){" + FIELDS + "}}", Map.of("id", id)).path("Media");
@@ -45,13 +47,22 @@ public class AnimeCatalogService {
         return repository.findById(id).orElseThrow(() -> new ApiException(502, "애니 저장 결과를 찾을 수 없습니다."));
     }
     public AnimeDetailResponse localize(AnimeDetailResponse value) {
+        Document stored = store.find("animes", query(where("_id").is(value.id())));
         String title = value.title();
-        if (title != null && !title.matches("(?s).*[가-힣].*") && title.matches("(?s).*[\\u3040-\\u30ff\\u3400-\\u9fff].*"))
-            title = translations.translate(title, "title");
+        Document titleMeta = stored == null ? null : stored.get("localization", Document.class);
+        String selectedTitle = titleMeta == null ? "" : Objects.toString(titleMeta.getString("title"), "");
+        if (!selectedTitle.isBlank()) title = selectedTitle;
+        else if (!AnimeLocalizationService.protectedTitle(stored))
+            title = localizeField(value.id(), "title", "title", title, "title", title, stored);
         List<AnimeDocument.AnimeCharacter> sourceCharacters = value.characters() == null ? List.of() : value.characters();
         List<String> characterNames = sourceCharacters.stream()
                 .map(character -> character.name() == null ? "" : character.name().nativeTitle()).toList();
-        List<String> translatedNames = translations.translateCharacters(characterNames);
+        List<String> translatedNames = new ArrayList<>();
+        for (int i = 0; i < characterNames.size(); i++) {
+            String field = characterKey(sourceCharacters.get(i).anilistId(), i);
+            translatedNames.add(localizeField(value.id(), field, "characters." + i + ".name.native",
+                    characterNames.get(i), "character", characterNames.get(i), stored));
+        }
         List<AnimeDocument.AnimeCharacter> characters = new ArrayList<>();
         for (int i = 0; i < sourceCharacters.size(); i++) {
             AnimeDocument.AnimeCharacter character = sourceCharacters.get(i);
@@ -59,11 +70,18 @@ public class AnimeCatalogService {
                     character.name() == null ? null : new AnimeDocument.CharacterName(character.name().full(), translatedNames.get(i)), character.image()));
         }
         return new AnimeDetailResponse(value.id(), value.idMal(), value.type(), title, value.originalTitle(),
-                translations.translate(value.description(), "synopsis"), value.image(), value.bannerImage(),
-                value.genres() == null ? List.of() : value.genres().stream().map(translations::genre).toList(),
+                localizeField(value.id(), "synopsis", "description", value.description(), "synopsis", value.description(), stored), value.image(), value.bannerImage(),
+                value.genres() == null ? List.of() : localizeGenres(value.id(), value.genres(), stored),
                 value.days(), value.startDate(), value.season(), value.seasonYear(), value.episodes(), value.status(),
                 value.averageScore(), value.popularity(), value.studio() == null || value.studio().isEmpty() ? List.of("미정") : value.studio(),
                 value.nextAiringEpisode(), value.trailer(), characters);
+    }
+    public AnimeDetailResponse localizeStored(int id) {
+        return localize(AnimeDetailResponse.from(repository.findById(id)
+                .orElseThrow(() -> new ApiException(404, "애니를 찾을 수 없습니다."))));
+    }
+    public String repairTitle(int id, String source, String previous) {
+        return localization.translate(id, "title", "title", source, "title", previous);
     }
     public int sync(String type, String season, int year, boolean allPages) {
         String filter = switch (type) {
@@ -105,12 +123,22 @@ public class AnimeCatalogService {
         int id = media.path("id").asInt();
         if (id <= 0) throw new ApiException(502, "AniList ID가 올바르지 않습니다.");
         Document old = store.find("animes", query(where("_id").is(id)));
+        // New documents must exist before field states and durable jobs are written.
+        if (old == null) store.update("animes", query(where("_id").is(id)), new Update().setOnInsert("createdAt", new Date()), true);
         // Keep listing requests so new anime can still be discovered, but do
         // not rewrite an existing finished anime during catalog sync. A direct
         // detail request still bypasses this rule and may refresh the record.
-        if (old != null && !type.equals("detail") && isFinished(old)) return;
-        if (unchanged(media, old, type)) {
+        if (old != null && !type.equals("detail") && isFinished(old)
+                && old.getDate("lastSyncedAt") != null
+                && old.getDate("lastSyncedAt").toInstant().isAfter(Instant.now().minus(Duration.ofDays(30)))) {
             Update checked = new Update().set("lastCheckedAt", new Date());
+            checked.addToSet("contentTypes").each(type, "detail");
+            if (type.equals("genre")) checked.set("isCatalogActive", true);
+            store.update("animes", query(where("_id").is(id)), checked, false);
+            return;
+        }
+        if (unchanged(media, old, type)) {
+            Update checked = new Update().set("lastCheckedAt", new Date()).set("lastSyncedAt", new Date());
             checked.addToSet("contentTypes").each(type, "detail");
             if (type.equals("genre")) checked.set("isCatalogActive", true);
             store.update("animes", query(where("_id").is(id)), checked, false);
@@ -154,9 +182,10 @@ public class AnimeCatalogService {
     Document mapMedia(JsonNode media, Document old, String type) {
         String sourceTitle = first(media.path("title"), "native", "romaji", "english");
         String oldTitle = old == null ? "" : Objects.toString(old.getString("title"), "");
-        Document localization = old == null ? null : old.get("localization", Document.class);
-        String verified = localization == null ? "" : Objects.toString(localization.getString("title"), "");
-        String title = !verified.isBlank() ? verified : oldTitle.matches("(?s).*[가-힣].*") ? oldTitle : translations.translate(sourceTitle, "title");
+        Document titleMetadata = old == null ? null : old.get("localization", Document.class);
+        String verified = titleMetadata == null ? "" : Objects.toString(titleMetadata.getString("title"), "");
+        String title = !verified.isBlank() ? verified : localization.translate(media.path("id").asInt(), "title", "title",
+                sourceTitle, "title", oldTitle);
         if (title.isBlank()) title = sourceTitle;
         JsonNode airing = media.path("nextAiringEpisode");
         boolean detail = type.equals("detail");
@@ -167,19 +196,25 @@ public class AnimeCatalogService {
                 .append("extraLarge", media.path("coverImage").path("extraLarge").asText(""))
                 .append("banner", media.path("bannerImage").asText(""));
         List<String> genres = new ArrayList<>(), studios = new ArrayList<>();
-        media.path("genres").forEach(value -> genres.add(translations.genre(value.asText())));
+        List<String> sourceGenres = new ArrayList<>();
+        media.path("genres").forEach(value -> sourceGenres.add(value.asText()));
+        genres.addAll(localizeGenres(media.path("id").asInt(), sourceGenres, null));
         media.path("studios").path("nodes").forEach(value -> { if (!value.path("name").asText().isBlank()) studios.add(value.path("name").asText()); });
         if (studios.isEmpty()) studios.add("미정");
         List<Document> characters = new ArrayList<>();
-        media.path("characters").path("edges").forEach(edge -> {
+        int characterIndex = 0;
+        for (JsonNode edge : media.path("characters").path("edges")) {
             JsonNode node = edge.path("node");
             characters.add(new Document("anilistId", nullable(node.path("id"))).append("role", edge.path("role").asText())
                     .append("name", new Document("full", node.path("name").path("full").asText())
-                            .append("native", translations.translate(node.path("name").path("native").asText(""), "character")))
+                            .append("native", localization.translate(media.path("id").asInt(), characterKey(node.path("id").asInt(), characterIndex),
+                                    "characters." + characterIndex + ".name.native",
+                                    first(node.path("name"), "native", "full"), "character", "")))
                     .append("image", new Document("large", node.path("image").path("large").asText(""))));
-        });
+            characterIndex++;
+        }
         String cleanDescription = media.path("description").asText("").replaceAll("<[^>]*>", "").trim();
-        String description = cleanDescription.isBlank() ? "줄거리 정보 없음" : translations.translate(cleanDescription, "synopsis");
+        String description = cleanDescription.isBlank() ? "줄거리 정보 없음" : localization.translate(media.path("id").asInt(), "synopsis", "description", cleanDescription, "synopsis", old == null ? "" : old.getString("description"));
         String days = "";
         if (airing.path("airingAt").isNumber()) {
             int day = Instant.ofEpochSecond(airing.path("airingAt").asLong()).atZone(ZoneId.of("Asia/Seoul")).getDayOfWeek().getValue();
@@ -188,7 +223,7 @@ public class AnimeCatalogService {
         Document values = new Document("idMal", nullable(media.path("idMal"))).append("type", media.path("format").asText("TV"))
                 .append("title", title).append("originalTitle", jsonDocument(media.path("title"))).append("image", image)
                 .append("bannerImage", media.path("bannerImage").asText("")).append("genres", genres).append("studio", studios)
-                .append("description", description).append("characters", characters).append("trailer", jsonDocument(media.path("trailer")))
+                .append("description", description).append("descriptionOriginal", cleanDescription).append("charactersOriginal", jsonDocument(media.path("characters"))).append("characters", characters).append("trailer", jsonDocument(media.path("trailer")))
                 .append("episodes", episodes).append("status", media.path("status").asText("")).append("season", media.path("season").asText(""))
                 .append("seasonYear", nullable(media.path("seasonYear"))).append("startDate", jsonDocument(media.path("startDate")))
                 .append("averageScore", media.path("averageScore").asInt()).append("popularity", media.path("popularity").asInt())
@@ -199,6 +234,26 @@ public class AnimeCatalogService {
         values.put("nextAiringEpisode", next);
         if (type.equals("genre")) values.put("isCatalogActive", true);
         return values;
+    }
+    private static String characterKey(Integer id, int index) {
+        return "character_" + (id != null && id > 0 ? id : "index_" + index);
+    }
+    private String localizeField(int id, String field, String path, String text, String domain, String previous, Document stored) {
+        Document meta = stored == null ? null : stored.get("localization", Document.class);
+        Document fields = meta == null ? null : meta.get("fields", Document.class);
+        Document state = fields == null ? null : fields.get(field, Document.class);
+        String source = state != null ? state.getString("source") : text;
+        return localization.translate(id, field, path, source, domain, previous);
+    }
+    private List<String> localizeGenres(int id, List<String> genres, Document stored) {
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < genres.size(); i++) {
+            String source = genres.get(i);
+            String known = TranslationService.knownGenre(source);
+            if (!TranslationService.needsTranslation(known)) result.add(known);
+            else result.add(localizeField(id, "genre_" + i, "genres." + i, source, "general", source, stored));
+        }
+        return result;
     }
     private static Document jsonDocument(JsonNode value) { return value.isObject() ? Document.parse(value.toString()) : null; }
     private static Object nullable(JsonNode node) { return node.isNumber() ? node.numberValue() : null; }

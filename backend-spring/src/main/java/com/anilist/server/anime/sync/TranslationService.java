@@ -62,6 +62,12 @@ public class TranslationService {
         if (text == null || text.isBlank()) return false;
         return hasJapaneseOrCjk(text) || (!hasKorean(text) && text.matches("(?s).*[A-Za-z].*"));
     }
+    public String configuredModel() { return localLlmEnabled ? localLlmModel : "google-translation"; }
+    public String configuredPromptVersion() { return localLlmEnabled ? TRANSLATION_PROMPT_VERSION : "google-v1"; }
+    public String configurationRevision() {
+        return UserService.sha256(localLlmEnabled ? TRANSLATION_PROMPT_VERSION + ":" + localLlmModel : "google-v1");
+    }
+    public static String knownGenre(String value) { return GENRES.getOrDefault(value, value); }
     public String genre(String value) { return GENRES.containsKey(value) ? GENRES.get(value) : translate(value, "general"); }
     public List<String> translateCharacters(List<String> names) {
         if (names == null || names.isEmpty()) return List.of();
@@ -104,10 +110,10 @@ public class TranslationService {
         String source = hasJapaneseOrCjk(text) ? "ja" : "en";
         String provider = provider(localLlmEnabled, domain);
         String cacheKey = cacheKey(provider, domain, source, text);
-        String cached = redis.get(cacheKey); if (cached != null && !cached.equals(text)) return cached;
+        String cached = redis.get(cacheKey); if (isValidTranslation(text, cached, domain)) return cached;
         var lookup = query(where("provider").is(provider).and("originalText").is(text).and("sourceLang").is(source).and("targetLang").is("ko"));
         Document saved = store.find("translations", lookup);
-        if (saved != null && saved.getString("translatedText") != null && !text.equals(saved.getString("translatedText"))) {
+        if (saved != null && isValidTranslation(text, saved.getString("translatedText"), domain)) {
             cached = saved.getString("translatedText"); redis.put(cacheKey, cached, Duration.ofDays(1)); return cached;
         }
         if (localLlmEnabled) {
@@ -128,9 +134,9 @@ public class TranslationService {
             lookup = query(where("provider").is(provider).and("originalText").is(text)
                     .and("sourceLang").is(source).and("targetLang").is("ko"));
             cached = redis.get(cacheKey);
-            if (cached != null && !cached.equals(text)) return cached;
+            if (isValidTranslation(text, cached, domain)) return cached;
             saved = store.find("translations", lookup);
-            if (saved != null && saved.getString("translatedText") != null && !text.equals(saved.getString("translatedText"))) {
+            if (saved != null && isValidTranslation(text, saved.getString("translatedText"), domain)) {
                 cached = saved.getString("translatedText");
                 redis.put(cacheKey, cached, Duration.ofDays(1));
                 return cached;
@@ -144,9 +150,9 @@ public class TranslationService {
     private String translateWithGoogle(String text, String source, String domain, String provider, String cacheKey,
             org.springframework.data.mongodb.core.query.Query lookup) {
         String cached = redis.get(cacheKey);
-        if (cached != null && !cached.equals(text)) return cached;
+        if (isValidTranslation(text, cached, domain)) return cached;
         Document saved = store.find("translations", lookup);
-        if (saved != null && saved.getString("translatedText") != null && !text.equals(saved.getString("translatedText")))
+        if (saved != null && isValidTranslation(text, saved.getString("translatedText"), domain))
             return saved.getString("translatedText");
         if (key.isBlank() || System.currentTimeMillis() < cooldown) return text;
         ExternalJsonClient.pause(nextRequest - System.currentTimeMillis()); nextRequest = System.currentTimeMillis() + interval;
@@ -164,6 +170,7 @@ public class TranslationService {
                 return text;
             }
             String translated = response.body().path("data").path("translations").path(0).path("translatedText").asText(text).trim();
+            if (!isValidTranslation(text, translated, domain)) return text;
             if (!translated.isBlank() && !translated.equals(text)) {
                 store.update("translations", lookup, new Update().set("translatedText", translated)
                         .set("translationStatus", "auto-approved")
@@ -223,6 +230,7 @@ public class TranslationService {
 
     private boolean isValidTranslation(String original, String translated, String domain) {
         if (translated == null || translated.isBlank() || translated.equals(original)) return false;
+        if (needsTranslation(translated)) return false;
         if (translated.startsWith("번역:") || translated.startsWith("번역 결과:")) return false;
         return !domain.equals("synopsis") || translated.length() <= original.length() * 3 + 500;
     }

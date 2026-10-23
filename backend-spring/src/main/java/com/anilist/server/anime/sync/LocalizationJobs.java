@@ -80,9 +80,16 @@ public class LocalizationJobs implements ApplicationRunner {
     public void localizeAll(boolean apply, int limit) {
         List<Document> anime = store.list("animes", new Query().with(Sort.by("_id")));
         if (limit > 0 && anime.size() > limit) anime = new ArrayList<>(anime.subList(0, limit));
-        int processed = 0, updated = 0;
+        int processed = 0;
         try {
             for (Document row : anime) {
+                if (apply) {
+                    catalog.localizeStored(((Number) row.get("_id")).intValue());
+                    processed++;
+                    if (processed % 100 == 0) log.info("Localization attempts: {}/{} (apply=true)", processed, anime.size());
+                    pauseBetweenItems();
+                    continue;
+                }
                 String description = Objects.toString(row.getString("description"), "");
                 String translatedDescription = translations.translate(description, "synopsis");
                 List<Document> characters = row.getList("characters", Document.class);
@@ -99,17 +106,14 @@ public class LocalizationJobs implements ApplicationRunner {
                     if (name != null) character.put("name", new Document(name).append("native", translatedNames.get(i)));
                     translatedCharacters.add(character);
                 }
-                if (apply && (!description.equals(translatedDescription) || !characters.equals(translatedCharacters))) {
-                    store.update("animes", query(where("_id").is(row.get("_id"))),
-                            new Update().set("description", translatedDescription).set("characters", translatedCharacters), false);
-                    updated++;
-                }
+                if (!description.equals(translatedDescription) || !characters.equals(translatedCharacters))
+                    log.debug("Localization preview: animeId={} changesAvailable=true", row.get("_id"));
                 processed++;
-                if (processed % 100 == 0) log.info("Localization progress: {}/{} processed, {} updated (apply={})", processed, anime.size(), updated, apply);
+                if (processed % 100 == 0) log.info("Localization progress: {}/{} processed (apply={})", processed, anime.size(), apply);
                 pauseBetweenItems();
             }
         } finally { if (apply) cache.invalidate(); }
-        log.info("Localization complete: {} processed, {} updated (apply={})", processed, updated, apply);
+        log.info("Localization complete: {} processed (apply={})", processed, apply);
     }
 
     private void pauseBetweenItems() {
@@ -177,7 +181,7 @@ public class LocalizationJobs implements ApplicationRunner {
                     Document old = batch.stream().filter(d -> ((Number)d.get("_id")).intValue() == id).findFirst().orElse(null);
                     String title = row.path("koLabel").path("value").asText("").replaceAll("\\s+\\(애니메이션\\)$", "").trim();
                     String article = row.path("koArticle").path("value").asText("");
-                    if (old == null) continue;
+                    if (old == null || com.anilist.server.anime.localization.AnimeLocalizationService.protectedTitle(old)) continue;
                     matchedIds.add(id);
                     if (title.isBlank() || title.equals(old.getString("title"))) {
                         if (apply) store.update("animes", query(where("_id").is(id)), new Update()
@@ -225,11 +229,13 @@ public class LocalizationJobs implements ApplicationRunner {
     public void repair(boolean apply) {
         try {
             for (Document anime : store.list("animes", new Query())) {
+                if (com.anilist.server.anime.localization.AnimeLocalizationService.protectedTitle(anime)) continue;
                 String title = Objects.toString(anime.getString("title"), "");
                 if (title.matches("(?s).*[가-힣].*") || !title.matches("(?s).*[\\u3040-\\u30ff\\u3400-\\u9fff].*")) continue;
                 Document original = anime.get("originalTitle", Document.class);
                 String source = original == null ? title : Objects.toString(original.getString("native"), title);
-                String translated = translations.translate(source, "title");
+                String translated = apply ? catalog.repairTitle(((Number) anime.get("_id")).intValue(), source, title)
+                        : translations.translate(source, "title");
                 if (TranslationService.needsTranslation(translated)) continue;
                 log.info("Title repair {}: {} -> {} (apply={})", anime.get("_id"), title, translated, apply);
                 if (apply) store.update("animes", query(where("_id").is(anime.get("_id"))), new Update().set("title", translated), false);

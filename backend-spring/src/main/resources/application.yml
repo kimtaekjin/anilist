@@ -1,4 +1,8 @@
 spring:
+  task:
+    scheduling:
+      pool:
+        size: 2
   application:
     name: anilist-backend
   data:
@@ -32,6 +36,9 @@ app:
   cors-origins: ${CORS_ORIGINS:}
   redis-enabled: ${REDIS_ENABLED:false}
   initialize-indexes: ${MONGO_INITIALIZE_INDEXES:true}
+  localization:
+    retry-enabled: ${LOCALIZATION_RETRY_ENABLED:true}
+    retry-delay-ms: ${LOCALIZATION_RETRY_DELAY_MS:30000}
   sync:
     enabled: ${ANIME_SYNC_ENABLED:false}
     cron: ${ANIME_SYNC_CRON:0 0 0 * * *}

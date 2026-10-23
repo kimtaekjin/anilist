@@ -38,6 +38,19 @@ class AnimeHomeControllerTest {
     @MockitoBean private com.anilist.server.anime.sync.AnimeCatalogService catalog;
 
     @Test
+    void hidesUntranslatedTitles() throws Exception {
+        AnimeDocument untranslated = org.mockito.Mockito.mock(AnimeDocument.class);
+        when(untranslated.id()).thenReturn(99);
+        when(untranslated.title()).thenReturn("Untranslated title");
+        when(repository.findByContentType(eq("trending"), any())).thenReturn(List.of(untranslated, anime(1)));
+        when(repository.findByContentType(eq("completed"), any())).thenReturn(List.of());
+        when(repository.findByContentType(eq("ova"), any())).thenReturn(List.of());
+        mockMvc.perform(get("/service/anime/home"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.trending.length()").value(1))
+                .andExpect(jsonPath("$.trending[0]._id").value(1));
+    }
+
+    @Test
     void excludesOnlyReturnedTrendingFromCompletedBeforeLimiting() throws Exception {
         when(repository.findByContentType(eq("trending"), any()))
                 .thenReturn(List.of(anime(1), anime(2), anime(3)));
@@ -50,7 +63,7 @@ class AnimeHomeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.trending.length()").value(2))
                 .andExpect(jsonPath("$.trending[0]._id").value(1))
-                .andExpect(jsonPath("$.trending[0].title").value("Anime 1"))
+                .andExpect(jsonPath("$.trending[0].title").value("애니 1"))
                 .andExpect(jsonPath("$.completed.length()").value(2))
                 .andExpect(jsonPath("$.completed[0]._id").value(3))
                 .andExpect(jsonPath("$.completed[1]._id").value(4))
@@ -91,7 +104,7 @@ class AnimeHomeControllerTest {
     }
 
     private AnimeDocument anime(int id) {
-        return new AnimeDocument(id, null, "TV", "Anime " + id, null, "", null, "", List.of(),
+        return new AnimeDocument(id, null, "TV", "애니 " + id, null, "", null, "", List.of(),
                 "", null, "FALL", 2026, 12, "FINISHED", 80, 100, List.of(), null,
                 List.of("trending", "completed", "ova"), true, null, List.of());
     }

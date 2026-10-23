@@ -40,6 +40,8 @@ public class MongoIndexes implements ApplicationRunner {
         mongo.indexOps("animecommentvotes").ensureIndex(new Index().on("commentId", Direction.ASC).on("userId", Direction.ASC).unique());
         mongo.indexOps("animecomments").ensureIndex(new Index().on("animeId", Direction.ASC).on("parentCommentId", Direction.ASC).on("recommendCount", Direction.DESC).on("createdAt", Direction.DESC));
         mongo.indexOps("animecomments").ensureIndex(new Index().on("animeId", Direction.ASC).on("parentCommentId", Direction.ASC).on("createdAt", Direction.DESC));
+        mongo.indexOps("animeLocalizationJobs").ensureIndex(new Index().on("status", Direction.ASC).on("nextRetryAt", Direction.ASC));
+        mongo.indexOps("animeLocalizationJobs").ensureIndex(new Index().on("status", Direction.ASC).on("leaseUntil", Direction.ASC));
         mongo.indexOps("translations").ensureIndex(new Index().on("provider", Direction.ASC).on("originalText", Direction.ASC)
                 .on("sourceLang", Direction.ASC).on("targetLang", Direction.ASC).unique());
     }

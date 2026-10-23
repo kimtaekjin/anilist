@@ -21,7 +21,7 @@ class CatalogServiceTest {
     private final DocumentStore store = mock(DocumentStore.class);
     private final MongoTemplate mongo = mock(MongoTemplate.class);
     private final AnimeCache cache = mock(AnimeCache.class);
-    private final AnimeCatalogService service = new AnimeCatalogService(client, translations, store, mongo, mock(AnimeRepository.class), cache);
+    private final AnimeCatalogService service = new AnimeCatalogService(client, translations, store, mongo, mock(AnimeRepository.class), cache, mock(com.anilist.server.anime.localization.AnimeLocalizationService.class));
     private final ObjectMapper json = new ObjectMapper();
     @Test void doesNotDeactivateCatalogWhenLaterPageFails() throws Exception {
         when(client.request(anyString(), anyMap())).thenReturn(json.readTree("{\"Page\":{\"media\":[],\"pageInfo\":{\"hasNextPage\":true}}}"))
